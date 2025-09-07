@@ -27,6 +27,12 @@ CORRELATION MATRIX:
 - Heatmap showing correlations between all spectral parameters
 - Helps identify strongly related parameters and potential redundancies
 
+RADAR PLOTS:
+- Individual radar plot for each subject showing averaged spectral parameters
+- Combined radar plot showing all subjects overlaid for comparison
+- Normalized values for fair comparison across different parameter scales
+- Includes relative power bands and all spectral parameters
+
 RELATIVE POWERS (Special Handling):
 - Box plot showing all 6 frequency bands side-by-side
 - Individual scatter plots for each frequency band (Delta, Theta, Alpha, Beta1, Beta2, Gamma)
@@ -39,7 +45,7 @@ The script automatically:
 - Handles missing data and NaN values gracefully
 - Uses proper frequency band names from the h5 file attributes
 - Saves all plots as high-resolution PNG files
-- Creates ~40+ different visualizations for comprehensive analysis
+- Creates ~50+ different visualizations for comprehensive analysis
 """
 
 import h5py
@@ -536,6 +542,204 @@ def create_correlation_matrix(data: Dict[str, Dict[str, np.ndarray]], output_dir
 
     print("Saved correlation matrix heatmap")
 
+def create_radar_plots(data: Dict[str, Dict[str, np.ndarray]], output_dir: str = "plots"):
+    """
+    Create radar plots for each subject showing averaged spectral parameters.
+    """
+    Path(output_dir).mkdir(exist_ok=True)
+
+    # Get unique categories and assign colors
+    categories = list(set(extract_subject_category(subj) for subj in data.keys()))
+    color_map = plt.colormaps['tab10'](np.linspace(0, 1, len(categories)))
+    category_colors = dict(zip(categories, color_map))
+
+    # Get band names for relative powers
+    band_names = [f"Band {i+1}" for i in range(6)]
+    try:
+        with h5py.File("../h5test.h5", 'r') as f:
+            if "classical_bands" in f.attrs:
+                import json
+                bands_dict = json.loads(f.attrs["classical_bands"])
+                band_names = list(bands_dict.keys())
+    except:
+        pass
+
+    # Get parameter names (excluding relative_powers for now)
+    if not data:
+        return
+
+    first_subject = next(iter(data.values()))
+    param_names = [name for name in first_subject.keys() if name != "relative_powers"]
+
+    # Calculate averages for each subject
+    subject_averages = {}
+    for subject_name, params in data.items():
+        averages = {}
+        for param in param_names:
+            if param in params:
+                values = params[param]
+                # Remove NaN values
+                clean_values = values[~np.isnan(values)]
+                if len(clean_values) > 0:
+                    averages[param] = np.mean(clean_values)
+                else:
+                    averages[param] = np.nan
+
+        # Handle relative powers separately
+        if "relative_powers" in params:
+            rp_data = params["relative_powers"]
+            for band_idx, band_name in enumerate(band_names):
+                if band_idx < rp_data.shape[1]:
+                    band_values = rp_data[:, band_idx]
+                    clean_values = band_values[~np.isnan(band_values)]
+                    if len(clean_values) > 0:
+                        averages[f"relative_power_{band_name.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_').replace('.', '_')}"] = np.mean(clean_values)
+
+        subject_averages[subject_name] = averages
+
+    # Normalize data for radar plots
+    all_values = []
+    for subject_name, averages in subject_averages.items():
+        for param, value in averages.items():
+            if not np.isnan(value):
+                all_values.append((param, value))
+
+    # Calculate min/max for each parameter
+    param_ranges = {}
+    for param in param_names + [f"relative_power_{band_name.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_').replace('.', '_')}" for band_name in band_names]:
+        param_values = [subject_averages[s].get(param, np.nan) for s in subject_averages.keys()]
+        param_values = [v for v in param_values if not np.isnan(v)]
+        if param_values:
+            param_ranges[param] = (np.min(param_values), np.max(param_values))
+
+    # Create individual radar plots for each subject
+    for subject_name, averages in subject_averages.items():
+        fig, ax = plt.subplots(figsize=(10, 8), subplot_kw=dict(projection='polar'))
+
+        # Prepare data for radar plot
+        plot_params = []
+        plot_values = []
+
+        for param in param_names + [f"relative_power_{band_name.lower().replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_').replace('.', '_')}" for band_name in band_names]:
+            if param in averages and not np.isnan(averages[param]) and param in param_ranges:
+                plot_params.append(param)
+                # Normalize to 0-1 scale
+                min_val, max_val = param_ranges[param]
+                if max_val > min_val:
+                    normalized_value = (averages[param] - min_val) / (max_val - min_val)
+                else:
+                    normalized_value = 0.5  # If all values are the same
+                plot_values.append(normalized_value)
+
+        if len(plot_params) >= 3:  # Need at least 3 parameters for a meaningful radar plot
+            # Close the radar plot
+            angles = np.linspace(0, 2 * np.pi, len(plot_params), endpoint=False).tolist()
+            plot_values += plot_values[:1]  # Close the plot
+            angles += angles[:1]
+
+            # Get subject category color
+            category = extract_subject_category(subject_name)
+            color = category_colors[category]
+
+            # Plot the radar
+            ax.fill(angles, plot_values, color=color, alpha=0.25)
+            ax.plot(angles, plot_values, 'o-', linewidth=2, color=color)
+
+            # Set labels
+            formatted_labels = []
+            for param in plot_params:
+                if param.startswith("relative_power_"):
+                    # Extract band name
+                    band_part = param.replace("relative_power_", "").replace("_", " ").title()
+                    formatted_labels.append(f"RP {band_part}")
+                else:
+                    formatted_labels.append(param.replace("_", " ").title())
+
+            ax.set_xticks(angles[:-1])
+            ax.set_xticklabels(formatted_labels, fontsize=8)
+            ax.set_ylim(0, 1)
+            ax.set_title(f'Spectral Parameters Radar Plot\n{subject_name} ({category})', fontsize=14, pad=20)
+            ax.grid(True, alpha=0.3)
+
+            # Add value annotations
+            for i, (angle, value, param) in enumerate(zip(angles[:-1], plot_values[:-1], plot_params)):
+                if param in averages:
+                    raw_value = averages[param]
+                    ax.annotate(f'{raw_value:.3f}', (angle, value),
+                              xytext=(10, 10), textcoords='offset points',
+                              fontsize=7, ha='left', va='bottom',
+                              bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
+
+            plt.tight_layout()
+            plt.savefig(f"{output_dir}/radar_{subject_name.replace('.mat', '')}.png", dpi=300, bbox_inches='tight')
+            plt.close()
+
+            print(f"Saved radar plot for {subject_name}")
+        else:
+            print(f"Not enough valid parameters for radar plot of {subject_name}")
+            plt.close()
+
+    # Create combined radar plot showing all subjects
+    fig, ax = plt.subplots(figsize=(14, 10), subplot_kw=dict(projection='polar'))
+
+    # Get common parameters across all subjects
+    common_params = set()
+    for subject_name, averages in subject_averages.items():
+        valid_params = [p for p in averages.keys() if not np.isnan(averages[p])]
+        if not common_params:
+            common_params = set(valid_params)
+        else:
+            common_params = common_params.intersection(set(valid_params))
+
+    common_params = list(common_params)
+    if len(common_params) >= 3:
+        angles = np.linspace(0, 2 * np.pi, len(common_params), endpoint=False).tolist()
+
+        legend_elements = []
+        for subject_name, averages in subject_averages.items():
+            plot_values = []
+            for param in common_params:
+                if param in averages and param in param_ranges:
+                    min_val, max_val = param_ranges[param]
+                    if max_val > min_val:
+                        normalized_value = (averages[param] - min_val) / (max_val - min_val)
+                    else:
+                        normalized_value = 0.5
+                    plot_values.append(normalized_value)
+
+            if len(plot_values) == len(common_params):
+                # Close the plot
+                plot_values += plot_values[:1]
+
+                category = extract_subject_category(subject_name)
+                color = category_colors[category]
+
+                ax.plot(angles + angles[:1], plot_values, 'o-', linewidth=2, label=f'{subject_name} ({category})', color=color, alpha=0.7)
+
+        # Format labels
+        formatted_labels = []
+        for param in common_params:
+            if param.startswith("relative_power_"):
+                band_part = param.replace("relative_power_", "").replace("_", " ").title()
+                formatted_labels.append(f"RP {band_part}")
+            else:
+                formatted_labels.append(param.replace("_", " ").title())
+
+        ax.set_xticks(angles)
+        ax.set_xticklabels(formatted_labels, fontsize=9)
+        ax.set_ylim(0, 1)
+        ax.set_title('Combined Spectral Parameters Radar Plot\nAll Subjects', fontsize=16, pad=20)
+        ax.grid(True, alpha=0.3)
+
+        # Add legend
+        ax.legend(bbox_to_anchor=(1.15, 1), loc='upper left', fontsize=8)
+
+        plt.tight_layout()
+        plt.savefig(f"{output_dir}/radar_combined_all_subjects.png", dpi=300, bbox_inches='tight')
+        plt.close()
+
+        print("Saved combined radar plot for all subjects")
+
 def main():
     parser = argparse.ArgumentParser(description='Plot spectral parameters from h5 dataset')
     parser.add_argument('--h5_file', default='../h5test.h5', help='Path to h5 file (default: ../h5test.h5)')
@@ -567,6 +771,9 @@ def main():
 
         print("\nCreating correlation matrix...")
         create_correlation_matrix(spectral_data, args.output_dir)
+
+        print("\nCreating radar plots...")
+        create_radar_plots(spectral_data, args.output_dir)
 
         print(f"\nAll plots saved to '{args.output_dir}' directory")
 
