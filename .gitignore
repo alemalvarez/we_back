@@ -17,3 +17,5 @@ wandb/
 *.ipynb
 
 *.h5
+
+plots/
