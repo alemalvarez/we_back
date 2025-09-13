@@ -2,7 +2,7 @@ from datetime import datetime
 import json
 import os
 import time
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import h5py
@@ -31,10 +31,21 @@ Q_TSALLIS: float = 0.5
 
 def create_dataset(
         data_folder: str,
-        output_path: str,
-        comes_from_bbdds: bool = True
+        output_path: Optional[str] = None,
+        comes_from_bbdds: bool = True,
+        include_raw: bool = True,
+        include_psd: bool = True,
+        include_features: bool = True
 ) -> None:
     
+    # Handle default output path
+    if output_path is None:
+        # Get the last two parts of the path, joined by underscore
+        parts = os.path.normpath(data_folder).split(os.sep)
+        folder_name = "_".join(parts[-2:]) if len(parts) >= 2 else parts[-1]
+        output_path = f"{folder_name}.h5"
+        logger.info(f"No output path specified, using default: {output_path}")
+
     logger.info(f"Creating dataset from {data_folder} to {output_path}")
 
     try:
@@ -104,6 +115,12 @@ def create_dataset(
                     mean_value = np.mean(param_values)
                     logger.info(f"  {param_name}: {mean_value:.4f}")
 
+            # Conditionally include data based on flags
+            raw_data = signal_data if include_raw else None
+            psd_data = pxx_segments if include_psd else None
+            f_data = f if include_psd else None
+            spectral_params_data = spectral_params if include_features else None
+
             subjects.append(Subject(
                 category=file_name.split('_')[0],
                 file_origin=file_name,
@@ -112,24 +129,24 @@ def create_dataset(
                 filtering=cfg['filtering'],
                 trial_length_secs=cfg['trial_length_secs'],
                 ica_components_removed=cfg['N_discarded_ICA'],
-                raw_segments=signal_data,
+                raw_segments=raw_data,
                 spectral=Subject.SpectralData(
-                    psd=pxx_segments, 
-                    f=f, 
+                    psd=psd_data,
+                    f=f_data,
                     spectral_parameters=Subject.SpectralData.SpectralParameters(
-                        median_frequency=spectral_params['median_frequency'],
-                        spectral_edge_frequency_95=spectral_params['spectral_edge_frequency_95'],
-                        individual_alpha_frequency=spectral_params['individual_alpha_frequency'],
-                        transition_frequency=spectral_params['transition_frequency'],
-                        relative_powers=spectral_params['relative_powers'],
-                        renyi_entropy=spectral_params['renyi_entropy'],
-                        shannon_entropy=spectral_params['shannon_entropy'],
-                        tsallis_entropy=spectral_params['tsallis_entropy'],
-                        spectral_crest_factor=spectral_params['spectral_crest_factor'],
-                        spectral_centroid=spectral_params['spectral_centroid'],
-                        spectral_bandwidth=spectral_params['spectral_bandwidth']
-                    )
-                )
+                        median_frequency=spectral_params_data['median_frequency'] if spectral_params_data else None,
+                        spectral_edge_frequency_95=spectral_params_data['spectral_edge_frequency_95'] if spectral_params_data else None,
+                        individual_alpha_frequency=spectral_params_data['individual_alpha_frequency'] if spectral_params_data else None,
+                        transition_frequency=spectral_params_data['transition_frequency'] if spectral_params_data else None,
+                        relative_powers=spectral_params_data['relative_powers'] if spectral_params_data else None,
+                        renyi_entropy=spectral_params_data['renyi_entropy'] if spectral_params_data else None,
+                        shannon_entropy=spectral_params_data['shannon_entropy'] if spectral_params_data else None,
+                        tsallis_entropy=spectral_params_data['tsallis_entropy'] if spectral_params_data else None,
+                        spectral_crest_factor=spectral_params_data['spectral_crest_factor'] if spectral_params_data else None,
+                        spectral_centroid=spectral_params_data['spectral_centroid'] if spectral_params_data else None,
+                        spectral_bandwidth=spectral_params_data['spectral_bandwidth'] if spectral_params_data else None
+                    ) if spectral_params_data else None
+                ) if (psd_data is not None or f_data is not None or spectral_params_data is not None) else None
             ))
 
             logger.info(f"Subject {subjects[-1]}")
@@ -171,27 +188,46 @@ def create_dataset(
             subj_group.attrs['ica_components_removed'] = subject.ica_components_removed
             subj_group.attrs['trial_length_secs'] = subject.trial_length_secs
 
-            n_samples, n_channels = subject.raw_segments.shape[1:]
+            # Conditionally save raw segments
+            if include_raw and subject.raw_segments is not None:
+                n_samples, n_channels = subject.raw_segments.shape[1:]
+                subj_group.create_dataset('raw_segments', data=subject.raw_segments, compression='gzip', chunks=(1, n_samples, n_channels))
 
-            subj_group.create_dataset('raw_segments', data=subject.raw_segments, compression='gzip', chunks=(1, n_samples, n_channels))
+            # Create spectral group only if needed
+            if subject.spectral is not None:
+                spectral_group = subj_group.create_group('spectral')
 
-            spectral_group = subj_group.create_group('spectral')
-            spectral_group.create_dataset('psd', data=subject.spectral.psd, compression='gzip', dtype=np.float32)
-            spectral_group.create_dataset('f', data=subject.spectral.f, compression='gzip')
+                # Conditionally save PSD data
+                if include_psd and subject.spectral.psd is not None:
+                    spectral_group.create_dataset('psd', data=subject.spectral.psd, compression='gzip', dtype=np.float32)
+                if include_psd and subject.spectral.f is not None:
+                    spectral_group.create_dataset('f', data=subject.spectral.f, compression='gzip')
 
-            spectral_params_group = spectral_group.create_group('spectral_parameters')
-            spectral_params_group.create_dataset('median_frequency', data=subject.spectral.spectral_parameters.median_frequency, compression='gzip')
-            spectral_params_group.create_dataset('spectral_edge_frequency_95', data=subject.spectral.spectral_parameters.spectral_edge_frequency_95, compression='gzip')
-            spectral_params_group.create_dataset('individual_alpha_frequency', data=subject.spectral.spectral_parameters.individual_alpha_frequency, compression='gzip')
-            spectral_params_group.create_dataset('transition_frequency', data=subject.spectral.spectral_parameters.transition_frequency, compression='gzip')
-            spectral_params_group.create_dataset('relative_powers', data=subject.spectral.spectral_parameters.relative_powers, compression='gzip')
-            spectral_params_group.create_dataset('renyi_entropy', data=subject.spectral.spectral_parameters.renyi_entropy, compression='gzip')
-            spectral_params_group.create_dataset('shannon_entropy', data=subject.spectral.spectral_parameters.shannon_entropy, compression='gzip')
-            spectral_params_group.create_dataset('tsallis_entropy', data=subject.spectral.spectral_parameters.tsallis_entropy, compression='gzip')
-
-            spectral_params_group.create_dataset('spectral_crest_factor', data=subject.spectral.spectral_parameters.spectral_crest_factor, compression='gzip')
-            spectral_params_group.create_dataset('spectral_centroid', data=subject.spectral.spectral_parameters.spectral_centroid, compression='gzip')
-            spectral_params_group.create_dataset('spectral_bandwidth', data=subject.spectral.spectral_parameters.spectral_bandwidth, compression='gzip')
+                # Conditionally save spectral parameters
+                if include_features and subject.spectral.spectral_parameters is not None:
+                    spectral_params_group = spectral_group.create_group('spectral_parameters')
+                    if subject.spectral.spectral_parameters.median_frequency is not None:
+                        spectral_params_group.create_dataset('median_frequency', data=subject.spectral.spectral_parameters.median_frequency, compression='gzip')
+                    if subject.spectral.spectral_parameters.spectral_edge_frequency_95 is not None:
+                        spectral_params_group.create_dataset('spectral_edge_frequency_95', data=subject.spectral.spectral_parameters.spectral_edge_frequency_95, compression='gzip')
+                    if subject.spectral.spectral_parameters.individual_alpha_frequency is not None:
+                        spectral_params_group.create_dataset('individual_alpha_frequency', data=subject.spectral.spectral_parameters.individual_alpha_frequency, compression='gzip')
+                    if subject.spectral.spectral_parameters.transition_frequency is not None:
+                        spectral_params_group.create_dataset('transition_frequency', data=subject.spectral.spectral_parameters.transition_frequency, compression='gzip')
+                    if subject.spectral.spectral_parameters.relative_powers is not None:
+                        spectral_params_group.create_dataset('relative_powers', data=subject.spectral.spectral_parameters.relative_powers, compression='gzip')
+                    if subject.spectral.spectral_parameters.renyi_entropy is not None:
+                        spectral_params_group.create_dataset('renyi_entropy', data=subject.spectral.spectral_parameters.renyi_entropy, compression='gzip')
+                    if subject.spectral.spectral_parameters.shannon_entropy is not None:
+                        spectral_params_group.create_dataset('shannon_entropy', data=subject.spectral.spectral_parameters.shannon_entropy, compression='gzip')
+                    if subject.spectral.spectral_parameters.tsallis_entropy is not None:
+                        spectral_params_group.create_dataset('tsallis_entropy', data=subject.spectral.spectral_parameters.tsallis_entropy, compression='gzip')
+                    if subject.spectral.spectral_parameters.spectral_crest_factor is not None:
+                        spectral_params_group.create_dataset('spectral_crest_factor', data=subject.spectral.spectral_parameters.spectral_crest_factor, compression='gzip')
+                    if subject.spectral.spectral_parameters.spectral_centroid is not None:
+                        spectral_params_group.create_dataset('spectral_centroid', data=subject.spectral.spectral_parameters.spectral_centroid, compression='gzip')
+                    if subject.spectral.spectral_parameters.spectral_bandwidth is not None:
+                        spectral_params_group.create_dataset('spectral_bandwidth', data=subject.spectral.spectral_parameters.spectral_bandwidth, compression='gzip')
 
             logger.info(f"Subject {subject.file_origin} written to {output_path}")
                 
@@ -226,13 +262,23 @@ def save_to_wandb(
         run.log_artifact(dataset)
 
 if __name__ == "__main__":
+    # Example with default output path (will use HURH.h5)
     create_dataset(
         data_folder="/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH",
-        output_path="h5test.h5"
+        comes_from_bbdds=False
     )
 
-    save_to_wandb(
-        dataset_path="h5test.h5"
+    # Example with custom flags for smaller dataset
+    create_dataset(
+        data_folder="/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH",
+        output_path="h5test_features_only.h5",
+        include_raw=False,
+        include_psd=False,
+        include_features=True
     )
+
+    # save_to_wandb(
+    #     dataset_path="HURH.h5"
+    # )
 
     

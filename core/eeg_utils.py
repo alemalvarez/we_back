@@ -159,7 +159,12 @@ def get_nice_data(
     data = raw_data['data']
     cfg_data = data['cfg'] # Renamed for clarity before passing to specific extractors
 
-    cfg = _extract_important_params(cfg_data) if not comes_from_bbdds else _extract_important_params_bbdds(cfg_data)
+    try:
+        cfg = _extract_important_params(cfg_data) if not comes_from_bbdds else _extract_important_params_bbdds(cfg_data)
+    except ValueError as e:
+        logger.error(f"You probably messed up comes_from_bbdds flag... try the other one!" )
+        raise e
+    
     cfg['name'] = name
 
     signal_arr = data['signal'][0, 0] if not comes_from_bbdds else _flatten_data(data['signal'], cfg) # Renamed for clarity
