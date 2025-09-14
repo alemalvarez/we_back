@@ -76,7 +76,7 @@ else:
 if tf_initial is not None:
     logger.success(f"Initial TF for the first segment: {tf_initial:.2f} Hz")
 else:
-    logger.warning(f"Could not calculate initial TF for the first segment.")
+    logger.warning("Could not calculate initial TF for the first segment.")
     
 
 # Optional: Visualización

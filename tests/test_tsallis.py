@@ -1,19 +1,18 @@
-from zlib import DEF_BUF_SIZE
 import pytest
 import numpy as np
 from scipy import signal # type: ignore
-import warnings
 
 from spectral.tsallis_entropy import calcular_te as tsallis_entropy_psd
 from spectral.shannon_entropy import calcular_se as shannon_entropy_psd
-from spectral.renyi_entropy import calcular_re as renyi_entropy_psd
+
+from core.eeg_utils import get_spectral_density as compute_psd
 
 DEFAULT_BAND = [0.5, 70.0]
 CFG = {
     "fs": 1000
 }
 
-from core.eeg_utils import get_spectral_density as compute_psd
+
 
 class TestTsallisEntropyPSD:
     """
@@ -133,7 +132,6 @@ class TestTsallisEntropyPSD:
         """Test that Tsallis entropy converges to Shannon entropy as q → 1"""
         signals = self.generate_test_signals()
 
-        import matplotlib.pyplot as plt  # type: ignore
 
 
         sig = signals['pure_sine']

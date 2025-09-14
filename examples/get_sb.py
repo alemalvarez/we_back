@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from loguru import logger
-from typing import List, Dict, Any, Optional, Tuple, Union
+from typing import List, Dict, Optional
 
 import core.eeg_utils as eeg  # Assuming eeg_utils.py is in the Python path
 from spectral.spectral_bandwidth import calcular_sb

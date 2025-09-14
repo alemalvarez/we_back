@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from loguru import logger
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 
 import core.eeg_utils as eeg
 from spectral.shannon_entropy import calcular_se # Import the SE calculation function

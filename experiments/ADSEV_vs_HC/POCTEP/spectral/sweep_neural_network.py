@@ -100,7 +100,6 @@ def main():
     })
 
     train_loader = DataLoader(training_dataset, batch_size=config.batch_size, shuffle=True)
-    validation_loader = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=True)
     validation_loader_no_shuffle = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=False)
 
     logger.info("Data ready")

@@ -52,7 +52,7 @@ import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from typing import Dict, List, Any
+from typing import Dict
 from pathlib import Path
 import argparse
 
@@ -695,7 +695,6 @@ def create_radar_plots(data: Dict[str, Dict[str, np.ndarray]], output_dir: str =
     if len(common_params) >= 3:
         angles = np.linspace(0, 2 * np.pi, len(common_params), endpoint=False).tolist()
 
-        legend_elements = []
         for subject_name, averages in subject_averages.items():
             plot_values = []
             for param in common_params:

@@ -17,3 +17,11 @@ dependencies = [
     "torchvision>=0.23.0",
     "wandb>=0.21.3",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.13.0",
+]
+
+[tool.ruff]
+exclude = ["tests", "scripts/plot_all.py", "examples"]

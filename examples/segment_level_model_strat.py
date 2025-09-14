@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import pandas as pd # type: ignore
 from loguru import logger
@@ -162,8 +161,10 @@ def main() -> None:
     files_by_category: Dict[str, List[str]] = defaultdict(list)
     for file_name in all_file_names:
         label = get_multiclass_label(file_name)
-        if label: files_by_category[label].append(file_name)
-        else: logger.warning(f"Could not determine category for file: {file_name}, it will be excluded.")
+        if label: 
+            files_by_category[label].append(file_name)
+        else: 
+            logger.warning(f"Could not determine category for file: {file_name}, it will be excluded.")
 
     train_files: List[str] = []
     test_files: List[str] = []
@@ -193,7 +194,8 @@ def main() -> None:
     test_segment_data_all = load_and_extract_features_from_files(test_files, mat_files_map)
 
     if not train_segment_data_all or not test_segment_data_all:
-        logger.error("No segments extracted for training or testing after feature extraction. Exiting."); return
+        logger.error("No segments extracted for training or testing after feature extraction. Exiting.")
+        return
 
     train_df_all = pd.DataFrame(train_segment_data_all)
     test_df_all = pd.DataFrame(test_segment_data_all)
@@ -242,7 +244,8 @@ def main() -> None:
         try:
             importances_b = pd.Series(model_b.feature_importances_, index=ALL_FEATURE_NAMES).sort_values(ascending=False)
             logger.info("Feature Importances (Binary):\n" + str(importances_b))
-        except Exception as fe_b_ex: logger.warning(f"Could not get binary feature importances: {fe_b_ex}")
+        except Exception as fe_b_ex: 
+            logger.warning(f"Could not get binary feature importances: {fe_b_ex}")
 
     # --- Multi-class Classification ---
     logger.info("\n--- Stratified Multi-class Classification ---")
@@ -282,7 +285,8 @@ def main() -> None:
         try:
             importances_m = pd.Series(model_m.feature_importances_, index=ALL_FEATURE_NAMES).sort_values(ascending=False)
             logger.info("Feature Importances (Multi-class):\n" + str(importances_m))
-        except Exception as fe_m_ex: logger.warning(f"Could not get multi-class feature importances: {fe_m_ex}")
+        except Exception as fe_m_ex: 
+            logger.warning(f"Could not get multi-class feature importances: {fe_m_ex}")
 
     logger.info("\n--- Stratified segment-level modeling finished. ---")
 

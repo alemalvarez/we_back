@@ -1,7 +1,6 @@
 import time
 from typing import Dict, Any, Tuple
 import os
-from pathlib import Path
 
 import h5py  # type: ignore
 import numpy as np
@@ -12,7 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 import wandb  # type: ignore
 from loguru import logger
 
-from examples.write_dataset import create_dataset, dummy_subjects, Subject
+from examples.write_dataset import create_dataset, Subject
 
 
 class EEGRawDataset(Dataset):
@@ -255,7 +254,7 @@ class EEGEfficiencyTester:
         spectral_features_array = np.concatenate(all_spectral_features, axis=0)
         labels_array = np.array(all_labels)
         
-        logger.info(f"📊 Dataset shapes:")
+        logger.info("📊 Dataset shapes:")
         logger.info(f"   Raw segments: {raw_segments_array.shape}")
         logger.info(f"   Spectral features: {spectral_features_array.shape}")
         logger.info(f"   Labels: {labels_array.shape}")

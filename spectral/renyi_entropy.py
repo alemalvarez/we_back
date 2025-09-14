@@ -32,7 +32,6 @@ def calcular_re(psd: np.ndarray, f: np.ndarray, banda: List[float], q_param: flo
     """
     EPSILON_Q_ONE = 1e-6  # More reasonable tolerance for q ≈ 1
     EPSILON_POWER = 1e-12  # Stricter tolerance for zero power
-    EPSILON_PDF_ZERO = 1e-12  # Stricter tolerance for PDF elements
 
     # --- Input Validation ---
     if not isinstance(psd, np.ndarray):
@@ -138,7 +137,7 @@ def calcular_re(psd: np.ndarray, f: np.ndarray, banda: List[float], q_param: flo
         
         return float(renyi_entropy_normalized)
         
-    except (OverflowError, ZeroDivisionError, ValueError) as e:
+    except (OverflowError, ZeroDivisionError, ValueError):
         # Handle numerical issues gracefully
         return None
 
@@ -166,7 +165,6 @@ def calcular_re_vector(psd: np.ndarray, f: np.ndarray, banda: List[float], q_par
     """
     EPSILON_Q_ONE = 1e-6
     EPSILON_POWER = 1e-12
-    EPSILON_PDF_ZERO = 1e-12
 
     # --- Input Validation ---
     if not isinstance(psd, np.ndarray):

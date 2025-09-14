@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from loguru import logger
 from spectral.median_frequency import calcular_mf
-from typing import List, Tuple, Optional
+from typing import List
 
 # Load all files
 all_files, names = eeg.load_files_from_folder('/Users/alemalvarez/code-workspace/TFG/DATA')
@@ -117,7 +117,7 @@ if np.any(positive_mask) and np.any(negative_mask):
     from scipy import stats  # type: ignore
     t_stat, p_value = stats.ttest_ind(mean_frequencies_array[positive_mask], 
                                      mean_frequencies_array[negative_mask])
-    logger.info(f"\nT-test Results:")
+    logger.info("\nT-test Results:")
     logger.info(f"t-statistic: {t_stat:.4f}")
     logger.info(f"p-value: {p_value:.4f}")
 

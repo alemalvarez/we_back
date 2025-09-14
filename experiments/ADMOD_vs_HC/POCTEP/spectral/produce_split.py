@@ -6,14 +6,12 @@ Creates subject-level splits to avoid data leakage between train/val/test sets.
 """
 # pyright: reportMissingTypeStubs=false
 
-import os
 import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 from collections import Counter
-from typing import List, Dict
 
 import h5py  # type: ignore[import]
 import numpy as np

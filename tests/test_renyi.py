@@ -1,8 +1,5 @@
 import pytest
 import numpy as np
-from typing import List, Tuple, Optional
-from unittest.mock import patch
-import warnings
 
 from core.eeg_utils import get_spectral_density
 from spectral.renyi_entropy import calcular_re

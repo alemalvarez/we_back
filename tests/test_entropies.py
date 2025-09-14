@@ -1,14 +1,11 @@
 import pytest
 import numpy as np
 from scipy import signal # type: ignore
-import warnings
 
 # Assuming your function is named shannon_entropy_psd
 # from your_module import shannon_entropy_psd
 
 from spectral.shannon_entropy import calcular_se as shannon_entropy_psd
-from spectral.tsallis_entropy import calcular_te as tsallis_entropy_psd
-from spectral.renyi_entropy import calcular_re as renyi_entropy_psd
 
 from core.eeg_utils import get_spectral_density as compute_psd
 

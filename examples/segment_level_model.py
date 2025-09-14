@@ -1,8 +1,7 @@
-import os
 import numpy as np
 import pandas as pd # type: ignore
 from loguru import logger
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Optional, Any
 
 from sklearn.model_selection import train_test_split # type: ignore
 from sklearn.ensemble import RandomForestClassifier # type: ignore

@@ -302,7 +302,7 @@ if ENABLE_WANDB:
         "val/final_roc_auc": roc_auc_score(y_true, y_pred_proba),
     })
 
-logger.success(f"Final validation metrics:")
+logger.success("Final validation metrics:")
 logger.success(f"  Accuracy: {accuracy_score(y_true, y_pred):.4f}")
 logger.success(f"  F1-Score: {f1_score(y_true, y_pred):.4f}")
 logger.success(f"  Precision: {precision_score(y_true, y_pred):.4f}")

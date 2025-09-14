@@ -1,6 +1,6 @@
 import numpy as np
 from loguru import logger
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Optional
 
 import core.eeg_utils as eeg
 from spectral.relative_powers import calcular_rp

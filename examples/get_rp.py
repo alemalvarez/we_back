@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from loguru import logger
-from typing import List, Dict, Any
+from typing import List, Dict
 
 import core.eeg_utils as eeg
 from spectral.relative_powers import calcular_rp # Import the Relative Power calculation function

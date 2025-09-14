@@ -162,7 +162,7 @@ def get_nice_data(
     try:
         cfg = _extract_important_params(cfg_data) if not comes_from_bbdds else _extract_important_params_bbdds(cfg_data)
     except ValueError as e:
-        logger.error(f"You probably messed up comes_from_bbdds flag... try the other one!" )
+        logger.error("You probably messed up comes_from_bbdds flag... try the other one!" )
         raise e
     
     cfg['name'] = name

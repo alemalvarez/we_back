@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Tuple
+from typing import List
 
 def calcular_rp(psd: np.ndarray, 
                 f: np.ndarray, 

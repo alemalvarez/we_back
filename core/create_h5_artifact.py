@@ -13,7 +13,7 @@ from loguru import logger
 
 from spectral.median_frequency import calcular_mf_vector
 from spectral.spectral_95_limit_frequency import calcular_sef95_vector
-from spectral.individual_alpha_frequency_transition_frequency import calcular_iaftf, calcular_iaftf_vector
+from spectral.individual_alpha_frequency_transition_frequency import calcular_iaftf_vector
 from spectral.relative_powers import calcular_rp_vector
 from spectral.renyi_entropy import calcular_re_vector
 from spectral.shannon_entropy import calcular_se_vector
@@ -234,7 +234,7 @@ def create_dataset(
             logger.info(f"Subject {subject.file_origin} written to {output_path}")
                 
     
-    logger.success(f"Dataset created successfully")
+    logger.success("Dataset created successfully")
 
 
 def save_to_wandb(
@@ -242,7 +242,7 @@ def save_to_wandb(
         project_name: str = "eeg-efficiency-test"
 ) -> None:
 
-    logger.info(f"Saving dataset to Weights & Biases")
+    logger.info("Saving dataset to Weights & Biases")
 
     with wandb.init(project=project_name, name=f"efficiency-test-{int(time.time())}") as run:
 
