@@ -48,6 +48,7 @@ class Subject:
             f"  sampling_rate: {self.sampling_rate} Hz\n"
             f"  n_segments: {self.n_segments}\n"
             f"  filtering: {self.filtering}\n"
+            f"  trial_length_secs: {self.trial_length_secs}\n"
             f"  ica_components_removed: {self.ica_components_removed}\n"
         )
 
