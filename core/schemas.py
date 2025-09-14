@@ -35,7 +35,8 @@ class Subject:
     filtering: dict
     ica_components_removed: int
     trial_length_secs: float
-
+    points_per_segment: int
+    
     raw_segments: Optional[np.ndarray]
     spectral: Optional[SpectralData]
 
@@ -50,6 +51,7 @@ class Subject:
             f"  filtering: {self.filtering}\n"
             f"  trial_length_secs: {self.trial_length_secs}\n"
             f"  ica_components_removed: {self.ica_components_removed}\n"
+            f"  points_per_segment: {self.points_per_segment}\n"
         )
 
         if self.raw_segments is not None:

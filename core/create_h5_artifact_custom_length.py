@@ -23,6 +23,39 @@ from spectral.spectral_centroid import calcular_sc_vector
 from spectral.spectral_bandwidth import calcular_sb_vector
 from core.schemas import Subject
 
+def divide_segments(signal_data: np.ndarray, dividing_factor: int) -> np.ndarray:
+    """
+    Divide EEG segments into smaller segments by splitting along the time axis.
+    
+    Args:
+        signal_data: EEG signal with shape (n_segments, n_samples, n_channels)
+        dividing_factor: Factor by which to divide each segment
+        
+    Returns:
+        np.ndarray: Divided signal with shape (n_segments * dividing_factor, n_samples // dividing_factor, n_channels)
+    """
+    if dividing_factor <= 1:
+        return signal_data
+    
+    n_segments, n_samples, n_channels = signal_data.shape
+    
+    # Check if n_samples is divisible by dividing_factor
+    if n_samples % dividing_factor != 0:
+        # Trim to make it divisible
+        new_n_samples = (n_samples // dividing_factor) * dividing_factor
+        signal_data = signal_data[:, :new_n_samples, :]
+        n_samples = new_n_samples
+        logger.warning(f"Trimmed samples from {signal_data.shape[1]} to {n_samples} to make divisible by {dividing_factor}")
+    
+    samples_per_segment = n_samples // dividing_factor
+    
+    # Reshape to split segments
+    reshaped = signal_data.reshape(n_segments, dividing_factor, samples_per_segment, n_channels)
+    # Reorder dimensions to get (n_segments * dividing_factor, samples_per_segment, n_channels)
+    divided_signal = reshaped.transpose(0, 1, 2, 3).reshape(n_segments * dividing_factor, samples_per_segment, n_channels)
+    
+    return divided_signal
+
 INTEREST_BAND: List[float] = [0.5, 70.0]
 IAFTF_Q: List[float] = [4.0, 15.0]
 NPERSEG: int = 256
@@ -35,7 +68,8 @@ def create_dataset(
         comes_from_bbdds: bool = True,
         include_raw: bool = True,
         include_psd: bool = True,
-        include_features: bool = True
+        include_features: bool = True,
+        dividing_factor: int = 1
 ) -> None:
     
     # Handle default output path
@@ -47,6 +81,8 @@ def create_dataset(
         logger.info(f"No output path specified, using default: {output_path}")
 
     logger.info(f"Creating dataset from {data_folder} to {output_path}")
+    if dividing_factor > 1:
+        logger.debug(f"Dividing factor: {dividing_factor}")
 
     try:
         all_files, names = eeg.load_files_from_folder(data_folder)
@@ -74,6 +110,15 @@ def create_dataset(
 
             n_segments, n_samples, n_channels = signal_data.shape
             logger.info(f"Signal segments: {n_segments}, Samples/segment: {n_samples}, Channels: {n_channels}")
+
+            # Apply dividing factor if specified
+            if dividing_factor > 1:
+                signal_data = divide_segments(signal_data, dividing_factor)
+
+                n_segments, n_samples, n_channels = signal_data.shape
+                logger.info(f"After dividing factor, signal segments: {n_segments}, Samples/segment: {n_samples}, Channels: {n_channels}")
+
+                
             total_segments += n_segments
 
             f, pxx_segments = eeg.get_spectral_density(signal_data, cfg, nperseg=NPERSEG)
@@ -130,14 +175,22 @@ def create_dataset(
                     if v is not None:
                         features_included.add(k)
 
+            logger.debug(f"Points per segment: {n_samples}")
+            logger.debug(f"Sampling rate: {cfg['fs']}")
+            logger.debug(f"Trial length secs: {cfg['trial_length_secs']} (before dividing factor)")
+
+            if dividing_factor > 1:
+                logger.warning(f"Updating trial length secs to {cfg['trial_length_secs'] / dividing_factor}")
+
             subjects.append(Subject(
                 category=file_name.split('_')[0],
                 file_origin=file_name,
                 sampling_rate=cfg['fs'],
                 n_segments=n_segments,
                 filtering=cfg['filtering'],
-                trial_length_secs=cfg['trial_length_secs'],
+                trial_length_secs=cfg['trial_length_secs'] / dividing_factor,
                 ica_components_removed=cfg['N_discarded_ICA'],
+                points_per_segment=n_samples,
                 raw_segments=raw_data,
                 spectral=Subject.SpectralData(
                     psd=psd_data,
@@ -184,6 +237,9 @@ def create_dataset(
         f.attrs['q_renyi'] = Q_RENYI
         f.attrs['q_tsallis'] = Q_TSALLIS
 
+        if dividing_factor > 1:
+            f.attrs['dividing_factor'] = dividing_factor
+
         subjects_group = f.create_group('subjects')
 
         logger.info(f"Creating dataset from {data_folder} to {output_path}")
@@ -198,6 +254,7 @@ def create_dataset(
             subj_group.attrs['filtering'] = json.dumps(subject.filtering)
             subj_group.attrs['ica_components_removed'] = subject.ica_components_removed
             subj_group.attrs['trial_length_secs'] = subject.trial_length_secs
+            subj_group.attrs['points_per_segment'] = subject.points_per_segment
 
             # Conditionally save raw segments
             if include_raw and subject.raw_segments is not None:
@@ -290,11 +347,11 @@ if __name__ == "__main__":
     # Example with custom flags for smaller dataset
     create_dataset(
         data_folder="/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH",
-        output_path="h5test_features_only.h5",
+        output_path="h5test_features_only_dividing_factor_10.h5",
         include_raw=False,
         include_psd=False,
         include_features=True,
-
+        dividing_factor=10
     )
 
     # save_to_wandb(
