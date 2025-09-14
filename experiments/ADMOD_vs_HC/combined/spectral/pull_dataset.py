@@ -8,7 +8,7 @@ def pull_dataset_from_wandb() -> None:
     """
     api = wandb.Api()
     artifact = api.artifact(
-        "alejandro-mata-university-of-valladolid/dataset_creation/combined_DK_features_only:v0",
+        "alejandro-mata-university-of-valladolid/dataset_creation/combined_features_df4.h5:v0",
         type="dataset"
     )
     artifact_dir = artifact.download()

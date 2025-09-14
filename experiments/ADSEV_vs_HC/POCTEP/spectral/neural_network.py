@@ -20,15 +20,16 @@ WANDB_CONFIG = {
     "random_seed": 42,
     "model_name": "SpectralNet_2layers",
     "input_size": 16,
-    "hidden_1_size": 18,
-    "hidden_2_size": 32,
-    "dropout_rate": 0.5,
-    "learning_rate": 0.001,
-    "weight_decay": 0.0001,
+    "hidden_1_size": 16,
+    "hidden_2_size": 64,
+    "dropout_rate": 0.25,
+    "learning_rate": 0.008,
+    "weight_decay": 0.0005,
     "batch_size": 128,
     "max_epochs": 50,
-    "patience": 10,
+    "patience": 20,
     "min_delta": 0.001,
+    "dividing_factor": 2,
     "scaler_type": "standard",
 }
 
@@ -46,6 +47,7 @@ class ModelConfig:
     max_epochs: int
     patience: int
     min_delta: float
+    dividing_factor: int
     scaler_type: Literal['min-max', 'standard', 'none']
 
 config = ModelConfig(**WANDB_CONFIG) # type: ignore
@@ -78,14 +80,19 @@ if ENABLE_WANDB:
     )
 
 
+if config.dividing_factor > 1:
+    h5_file_path = f"artifacts/POCTEP_features_df{config.dividing_factor}:v0/POCTEP_features_only_dividing_factor_{config.dividing_factor}.h5"
+else:
+    h5_file_path = "artifacts/POCTEP_DK_features_only:v0/POCTEP_DK_features_only.h5"
+
 training_dataset = SpectralDataset(
-    h5_file_path="artifacts/POCTEP_DK_features_only:v0/POCTEP_DK_features_only.h5", 
+    h5_file_path=h5_file_path, 
     subjects_txt_path="experiments/ADSEV_vs_HC/POCTEP/spectral/splits/training_subjects.txt",
     normalize=config.scaler_type
 )
 
 validation_dataset = SpectralDataset(
-    h5_file_path="artifacts/POCTEP_DK_features_only:v0/POCTEP_DK_features_only.h5", 
+    h5_file_path=h5_file_path, 
     subjects_txt_path="experiments/ADSEV_vs_HC/POCTEP/spectral/splits/validation_subjects.txt",
     normalize=config.scaler_type
 )
@@ -263,10 +270,24 @@ if ENABLE_WANDB:
         "val/final_roc_auc": roc_auc_score(y_true, y_pred_proba),
     })
 
-logger.info("Final validation metrics:")
-logger.info(f"  Accuracy: {accuracy_score(y_true, y_pred):.4f}")
-logger.info(f"  F1-Score: {f1_score(y_true, y_pred):.4f}")
-logger.info(f"  Precision: {precision_score(y_true, y_pred):.4f}")
-logger.info(f"  Recall: {recall_score(y_true, y_pred):.4f}")
-logger.info(f"  ROC-AUC: {roc_auc_score(y_true, y_pred_proba):.4f}")
+logger.success("Final validation metrics:")
+logger.success(f"  Accuracy: {accuracy_score(y_true, y_pred):.4f}")
+logger.success(f"  F1-Score: {f1_score(y_true, y_pred):.4f}")
+logger.success(f"  Precision: {precision_score(y_true, y_pred):.4f}")
+logger.success(f"  Recall: {recall_score(y_true, y_pred):.4f}")
+logger.success(f"  ROC-AUC: {roc_auc_score(y_true, y_pred_proba):.4f}")
 
+missclassified_indexes = np.where(y_pred != y_true)[0]
+logger.warning(f"Total misclassified samples: {len(missclassified_indexes)} out of {len(y_true)} total samples")
+
+# Only log first 10 misclassified samples to avoid spam
+for i, idx in enumerate(missclassified_indexes):
+    logger.warning(f"Missclassified sample {i+1}/{len(missclassified_indexes)} - Index {idx}: {validation_dataset.get_sample_to_subject(idx)}. Was classified as {y_pred[idx]} but should have been {y_true[idx]}")
+
+import matplotlib.pyplot as plt
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+
+cm = confusion_matrix(y_true, y_pred)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+disp.plot(cmap="Blues")
+plt.show()

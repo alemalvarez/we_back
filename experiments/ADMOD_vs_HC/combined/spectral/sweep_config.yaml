@@ -33,6 +33,9 @@ parameters:
   patience:
     values: [5, 10, 15, 20]
 
+  dividing_factor:
+    values: [1, 2, 4]
+
 program: experiments.ADMOD_vs_HC.combined.spectral.sweep_neural_network
 
 command:

@@ -29,6 +29,9 @@ parameters:
   patience:
     values: [5, 10, 15, 20]
 
+  dividing_factor:
+    values: [1, 2, 4]
+
 program: experiments.ADSEV_vs_HC.POCTEP.spectral.sweep_neural_network
 
 command:

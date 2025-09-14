@@ -36,7 +36,7 @@ def main():
     parser.add_argument('--hidden_1_size', type=int, default=32)
     parser.add_argument('--hidden_2_size', type=int, default=16)
     parser.add_argument('--patience', type=int, default=10)
-    parser.add_argument('--max_epochs', type=int, default=50)
+    parser.add_argument('--dividing_factor', type=int, default=1)
     parser.add_argument('--random_seed', type=int, default=42)
 
     args = parser.parse_args()
@@ -55,15 +55,21 @@ def main():
     now = datetime.now()
     wandb.run.name = f"SpectralNet_{now.month:02d}{now.day:02d}_{now.hour:02d}{now.minute:02d}"
 
+    # Determine H5 file path based on dividing factor
+    if config.dividing_factor > 1:
+        h5_file_path = f"artifacts/POCTEP_features_df{config.dividing_factor}:v0/POCTEP_features_only_dividing_factor_{config.dividing_factor}.h5"
+    else:
+        h5_file_path = "artifacts/POCTEP_DK_features_only:v0/POCTEP_DK_features_only.h5"
+
     # Create datasets
     training_dataset = SpectralDataset(
-        h5_file_path="artifacts/POCTEP_DK_features_only:v0/POCTEP_DK_features_only.h5",
+        h5_file_path=h5_file_path,
         subjects_txt_path="experiments/ADSEV_vs_HC/POCTEP/spectral/splits/training_subjects.txt",
         normalize="standard"
     )
 
     validation_dataset = SpectralDataset(
-        h5_file_path="artifacts/POCTEP_DK_features_only:v0/POCTEP_DK_features_only.h5",
+        h5_file_path=h5_file_path,
         subjects_txt_path="experiments/ADSEV_vs_HC/POCTEP/spectral/splits/validation_subjects.txt",
         normalize="standard"
     )
@@ -113,7 +119,7 @@ def main():
     train_accuracies = []
     val_accuracies = []
 
-    for epoch in range(config.max_epochs):
+    for epoch in range(50):  # Fixed max epochs
         model.train()
         epoch_loss = 0.0
         epoch_correct = 0
@@ -161,7 +167,7 @@ def main():
         val_accuracies.append(avg_val_accuracy)
 
         train_time = time.time() - epoch_start_time
-        logger.info(f"Epoch {epoch+1}/{config.max_epochs} completed in {train_time:.4f} seconds")
+        logger.info(f"Epoch {epoch+1}/50 completed in {train_time:.4f} seconds")
         logger.info(f"Train Loss: {avg_loss:.4f}, Train Accuracy: {avg_accuracy:.2f}%")
         logger.info(f"Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {avg_val_accuracy:.2f}%")
 

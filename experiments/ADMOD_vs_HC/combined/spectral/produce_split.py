@@ -135,7 +135,7 @@ def main():
     """Main function to create the dataset splits."""
 
     # Configuration
-    h5_path = "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5"
+    h5_path = "artifacts/combined_features_df2.h5:v0/combined_features_df2.h5"
     # Save splits to a sibling folder named "splits" relative to this script
     output_dir = str((Path(__file__).parent / "splits").resolve())
     random_state = 42

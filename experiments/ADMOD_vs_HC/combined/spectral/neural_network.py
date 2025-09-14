@@ -29,6 +29,7 @@ WANDB_CONFIG = {
     "max_epochs": 50,
     "patience": 5,
     "min_delta": 0.001,
+    "dividing_factor": 4,
     "scaler_type": "standard",
 }
 
@@ -46,6 +47,7 @@ class ModelConfig:
     max_epochs: int
     patience: int
     min_delta: float
+    dividing_factor: int
     scaler_type: Literal['min-max', 'standard', 'none']
 
 config = ModelConfig(**WANDB_CONFIG) # type: ignore
@@ -78,14 +80,19 @@ if ENABLE_WANDB:
         name=f"{config.model_name}_{now.month:02d}{now.day:02d}_{now.hour:02d}{now.minute:02d}"
     )
 
+if config.dividing_factor > 1:
+    h5_file_path = f"artifacts/combined_features_df{config.dividing_factor}.h5:v0/combined_features_df2.h5"
+else:
+    h5_file_path = "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5"
+
 training_dataset = SpectralDataset(
-    h5_file_path="artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5", 
+    h5_file_path=h5_file_path, 
     subjects_txt_path="experiments/ADMOD_vs_HC/combined/spectral/splits/training_subjects.txt",
     normalize=config.scaler_type
 )
 
 validation_dataset = SpectralDataset(
-    h5_file_path="artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5", 
+    h5_file_path=h5_file_path, 
     subjects_txt_path="experiments/ADMOD_vs_HC/combined/spectral/splits/validation_subjects.txt",
     normalize=config.scaler_type
 )

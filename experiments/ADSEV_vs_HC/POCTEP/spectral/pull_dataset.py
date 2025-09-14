@@ -8,7 +8,7 @@ def pull_dataset_from_wandb() -> None:
     """
     api = wandb.Api()
     artifact = api.artifact(
-        "alejandro-mata-university-of-valladolid/dataset_creation/POCTEP_DK_features_only:v0",
+        "alejandro-mata-university-of-valladolid/dataset_creation/POCTEP_features_df2:v0",
         type="dataset"
     )
     artifact_dir = artifact.download()
