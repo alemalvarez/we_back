@@ -17,14 +17,14 @@ WANDB_CONFIG = {
     "random_seed": 42,
     "model_name": "SpectralNet_2layers",
     "input_size": 16,
-    "hidden_1_size": 18,
-    "hidden_2_size": 32,
-    "dropout_rate": 0.5,
-    "learning_rate": 0.001,
-    "weight_decay": 0.0001,
-    "batch_size": 128,
+    "hidden_1_size": 16,
+    "hidden_2_size": 16,
+    "dropout_rate": 0.24,
+    "learning_rate": 0.003,
+    "weight_decay": 0.0002,
+    "batch_size": 32,
     "max_epochs": 50,
-    "patience": 10,
+    "patience": 5,
     "min_delta": 0.001,
     "scaler_type": "standard",
 }
@@ -96,6 +96,11 @@ validation_dataset = SpectralDataset(
     normalize=WANDB_CONFIG["scaler_type"]
 )
 
+logger.info(f"Training dataset size: {len(training_dataset)}")
+logger.info(f"Validation dataset size: {len(validation_dataset)}")
+logger.info(f"Training subjects: {len(set(training_dataset.sample_to_subject))}")
+logger.info(f"Validation subjects: {len(set(validation_dataset.sample_to_subject))}")
+
 if ENABLE_WANDB:
     wandb.log({
         "training_dataset_size": len(training_dataset),
@@ -106,7 +111,7 @@ train_loader = DataLoader(training_dataset, batch_size=WANDB_CONFIG["batch_size"
 validation_loader = DataLoader(validation_dataset, batch_size=WANDB_CONFIG["batch_size"], shuffle=True)
 validation_loader_no_shuffle = DataLoader(validation_dataset, batch_size=WANDB_CONFIG["batch_size"], shuffle=False)
 
-logger.info("Data ready")
+logger.success("Data ready")
 
 model = SpectralNet(
     input_size=WANDB_CONFIG["input_size"],
@@ -133,7 +138,7 @@ if ENABLE_WANDB:
         "optimizer": optimizer,
     })
 
-logger.info("Model ready")
+logger.success("Model ready")
 
 best_val_loss = float('inf')
 patience_counter = 0
@@ -194,8 +199,8 @@ for epoch in range(WANDB_CONFIG["max_epochs"]):
 
     train_time = time.time() - epoch_start_time
     logger.info(f"Epoch {epoch+1}/{WANDB_CONFIG['max_epochs']} completed in {train_time:.4f} seconds")
-    logger.info(f"Train Loss: {avg_loss:.4f}, Train Accuracy: {avg_accuracy:.2f}%")
-    logger.info(f"Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {avg_val_accuracy:.2f}%")
+    logger.info(f"Train Loss: {avg_loss:.4f}, Train Accuracy: {avg_accuracy:.2f}")
+    logger.info(f"Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {avg_val_accuracy:.2f}")
 
     if ENABLE_WANDB:
         wandb.log({
@@ -224,7 +229,7 @@ if best_model_state is not None:
     model.load_state_dict(best_model_state)
     logger.info("Best model loaded")
 
-logger.info("Training completed")
+logger.success("Training completed")
 
 if ENABLE_WANDB:
     wandb.log({
@@ -257,6 +262,16 @@ y_pred = np.array(y_pred_list)
 y_pred_proba = np.array(y_pred_proba_list)
 y_true = np.array(y_true_list)
 
+logger.info(f"Collected {len(y_true)} predictions from validation set")
+logger.info(f"Unique subjects in validation dataset: {len(set(validation_dataset.sample_to_subject))}")
+
+# Check for potential duplicates
+unique_pred_true_pairs = set(zip(y_pred, y_true))
+logger.info(f"Unique (prediction, true_label) pairs: {len(unique_pred_true_pairs)}")
+
+logger.debug(f"First 10 predictions: {y_pred[:10]}")
+logger.debug(f"First 10 true labels: {y_true[:10]}")
+
 # Create full probability matrix for compatibility with wandb plotting
 y_pred_proba_full = np.column_stack([1 - y_pred_proba, y_pred_proba])
 
@@ -269,10 +284,16 @@ if ENABLE_WANDB:
         "val/final_roc_auc": roc_auc_score(y_true, y_pred_proba),
     })
 
-logger.info(f"Final validation metrics:")
-logger.info(f"  Accuracy: {accuracy_score(y_true, y_pred):.4f}")
-logger.info(f"  F1-Score: {f1_score(y_true, y_pred):.4f}")
-logger.info(f"  Precision: {precision_score(y_true, y_pred):.4f}")
-logger.info(f"  Recall: {recall_score(y_true, y_pred):.4f}")
-logger.info(f"  ROC-AUC: {roc_auc_score(y_true, y_pred_proba):.4f}")
+logger.success(f"Final validation metrics:")
+logger.success(f"  Accuracy: {accuracy_score(y_true, y_pred):.4f}")
+logger.success(f"  F1-Score: {f1_score(y_true, y_pred):.4f}")
+logger.success(f"  Precision: {precision_score(y_true, y_pred):.4f}")
+logger.success(f"  Recall: {recall_score(y_true, y_pred):.4f}")
+logger.success(f"  ROC-AUC: {roc_auc_score(y_true, y_pred_proba):.4f}")
 
+missclassified_indexes = np.where(y_pred != y_true)[0]
+logger.warning(f"Total misclassified samples: {len(missclassified_indexes)} out of {len(y_true)} total samples")
+
+# Only log first 10 misclassified samples to avoid spam
+for i, idx in enumerate(missclassified_indexes):
+    logger.warning(f"Missclassified sample {i+1}/{len(missclassified_indexes)} - Index {idx}: {validation_dataset.get_sample_to_subject(idx)}. Was classified as {y_pred[idx]} but should have been {y_true[idx]}")

@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset
 import h5py  # type: ignore
 import torch
-from typing import Literal
+from typing import Literal, List
 from loguru import logger
 
 class SpectralDataset(Dataset):
@@ -15,6 +15,9 @@ class SpectralDataset(Dataset):
 
         features_list = []
         labels_list = []
+        self.sample_to_subject: List[str] = []
+
+        logger.info(f"Loading dataset from {h5_file_path} with {len(self.subject_ids)} subjects")
 
         with h5py.File(h5_file_path, 'r') as f:
             for subj_key in self.subject_ids:
@@ -50,6 +53,7 @@ class SpectralDataset(Dataset):
 
                     features_list.append(features)
                     labels_list.append(0 if subject.attrs['category'] == 'HC' else 1)
+                    self.sample_to_subject.append(subj_key)
 
         # Convert to tensors
         self.features = torch.tensor(features_list, dtype=torch.float32)
@@ -76,6 +80,9 @@ class SpectralDataset(Dataset):
     def __getitem__(self, idx):
         return self.features[idx], self.labels[idx]
 
+    def get_sample_to_subject(self, idx: int) -> str:
+        return self.sample_to_subject[idx]
+
 if __name__ == "__main__":
     dataset = SpectralDataset(
         h5_file_path="artifacts/POCTEP_DK_features_only:v0/POCTEP_DK_features_only.h5", 
@@ -84,3 +91,4 @@ if __name__ == "__main__":
     )
     print(dataset[0])
     print(len(dataset))
+    print(dataset.get_sample_to_subject(0))
