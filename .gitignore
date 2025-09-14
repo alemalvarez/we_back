@@ -19,3 +19,4 @@ wandb/
 *.h5
 
 plots/
+.cursor

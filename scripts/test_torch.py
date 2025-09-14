@@ -5,9 +5,13 @@ import torchvision # type: ignore
 import torchvision.transforms as transforms # type: ignore
 import time
 
-# Device configuration (CPU or CUDA)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f'Using device: {device}')
+# Device configuration for M1/M2 Mac (Apple Silicon)
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+    print("Using device: MPS (Apple Silicon)")
+else:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
 # Hyperparameters
 num_epochs = 5
