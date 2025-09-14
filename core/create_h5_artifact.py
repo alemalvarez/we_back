@@ -5,7 +5,7 @@ import time
 from typing import List, Optional
 
 import numpy as np
-import h5py
+import h5py  # type: ignore
 import wandb
 import core.eeg_utils as eeg
 
@@ -158,6 +158,8 @@ def create_dataset(
     logger.info(f"Creating dataset from {data_folder} to {output_path}")
 
     with h5py.File(output_path, 'w') as f:
+        assert isinstance(f, h5py.File)
+
         logger.info(f"Creating dataset from {data_folder} to {output_path}")
         f.attrs['description'] = f'Dataset from {data_folder}'
         f.attrs['version'] = '1.0.0'

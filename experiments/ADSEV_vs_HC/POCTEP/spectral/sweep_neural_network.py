@@ -15,7 +15,7 @@ import os
 # Add the project root to Python path
 sys.path.append(os.path.dirname(__file__))
 
-from experiments.ADSEV_vs_HC.POCTEP.spectral.spectral_dataset import SpectralDataset
+from core.spectral_dataset import SpectralDataset
 
 def get_device() -> torch.device:
     """Get the best available device."""

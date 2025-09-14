@@ -1,4 +1,5 @@
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
+from dataclasses import dataclass
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score # type: ignore
 from torch import nn
 import torch
 import numpy as np
@@ -8,8 +9,9 @@ from torch.utils.data import DataLoader
 import wandb
 from datetime import datetime
 import time
+from typing import Literal
 
-from experiments.ADMOD_vs_HC.combined.spectral.spectral_dataset import SpectralDataset
+from core.spectral_dataset import SpectralDataset
 
 # Configuration constants
 WANDB_PROJECT = "ADMOD_vs_HC"
@@ -28,6 +30,24 @@ WANDB_CONFIG = {
     "min_delta": 0.001,
     "scaler_type": "standard",
 }
+
+@dataclass
+class ModelConfig:
+    random_seed: int
+    model_name: str
+    input_size: int
+    hidden_1_size: int
+    hidden_2_size: int
+    dropout_rate: float
+    learning_rate: float
+    weight_decay: float
+    batch_size: int
+    max_epochs: int
+    patience: int
+    min_delta: float
+    scaler_type: Literal['min-max', 'standard', 'none']
+
+config = ModelConfig(**WANDB_CONFIG) # type: ignore
 
 ENABLE_WANDB: bool = False  # Set to False to disable wandb logging
 
@@ -67,8 +87,8 @@ class SpectralNet(nn.Module):
         return x
 
 # Set up random seeds and device
-torch.manual_seed(WANDB_CONFIG["random_seed"])
-np.random.seed(WANDB_CONFIG["random_seed"]) # type: ignore
+torch.manual_seed(config.random_seed)
+np.random.seed(config.random_seed) # type: ignore
 
 device = get_device()
 logger.info(f"Using device: {device}")
@@ -79,21 +99,19 @@ if ENABLE_WANDB:
     run = wandb.init(
         project=WANDB_PROJECT, 
         config=WANDB_CONFIG,
-        name=f"{WANDB_CONFIG['model_name']}_{now.month:02d}{now.day:02d}_{now.hour:02d}{now.minute:02d}"
+        name=f"{config.model_name}_{now.month:02d}{now.day:02d}_{now.hour:02d}{now.minute:02d}"
     )
-else:
-    run = None
 
 training_dataset = SpectralDataset(
     h5_file_path="artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5", 
     subjects_txt_path="experiments/ADMOD_vs_HC/combined/spectral/splits/training_subjects.txt",
-    normalize=WANDB_CONFIG["scaler_type"]
+    normalize=config.scaler_type
 )
 
 validation_dataset = SpectralDataset(
     h5_file_path="artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5", 
     subjects_txt_path="experiments/ADMOD_vs_HC/combined/spectral/splits/validation_subjects.txt",
-    normalize=WANDB_CONFIG["scaler_type"]
+    normalize=config.scaler_type
 )
 
 logger.info(f"Training dataset size: {len(training_dataset)}")
@@ -107,24 +125,24 @@ if ENABLE_WANDB:
         "validation_dataset_size": len(validation_dataset),
     })
 
-train_loader = DataLoader(training_dataset, batch_size=WANDB_CONFIG["batch_size"], shuffle=True)
-validation_loader = DataLoader(validation_dataset, batch_size=WANDB_CONFIG["batch_size"], shuffle=True)
-validation_loader_no_shuffle = DataLoader(validation_dataset, batch_size=WANDB_CONFIG["batch_size"], shuffle=False)
+train_loader = DataLoader(training_dataset, batch_size=config.batch_size, shuffle=True)
+validation_loader = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=True)
+validation_loader_no_shuffle = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=False)
 
 logger.success("Data ready")
 
 model = SpectralNet(
-    input_size=WANDB_CONFIG["input_size"],
-    hidden_1_size=WANDB_CONFIG["hidden_1_size"],
-    hidden_2_size=WANDB_CONFIG["hidden_2_size"],
-    dropout_rate=WANDB_CONFIG["dropout_rate"]
+    input_size=config.input_size,
+    hidden_1_size=config.hidden_1_size,
+    hidden_2_size=config.hidden_2_size,
+    dropout_rate=config.dropout_rate
 ).to(device)
 
 criterio = nn.BCEWithLogitsLoss()
 optimizer = optim.Adam(
     model.parameters(), 
-    lr=WANDB_CONFIG["learning_rate"],
-    weight_decay=WANDB_CONFIG["weight_decay"]
+    lr=config.learning_rate,
+    weight_decay=config.weight_decay
 )
 
 total_params = sum(p.numel() for p in model.parameters())
@@ -149,7 +167,7 @@ val_losses: list[float] = []
 train_accuracies: list[float] = []
 val_accuracies: list[float] = []
 
-for epoch in range(WANDB_CONFIG["max_epochs"]):
+for epoch in range(config.max_epochs):
     model.train()
     epoch_loss = 0.0
     epoch_correct = 0
@@ -198,7 +216,7 @@ for epoch in range(WANDB_CONFIG["max_epochs"]):
     val_accuracies.append(avg_val_accuracy)
 
     train_time = time.time() - epoch_start_time
-    logger.info(f"Epoch {epoch+1}/{WANDB_CONFIG['max_epochs']} completed in {train_time:.4f} seconds")
+    logger.info(f"Epoch {epoch+1}/{config.max_epochs} completed in {train_time:.4f} seconds")
     logger.info(f"Train Loss: {avg_loss:.4f}, Train Accuracy: {avg_accuracy:.2f}")
     logger.info(f"Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {avg_val_accuracy:.2f}")
 
@@ -212,7 +230,7 @@ for epoch in range(WANDB_CONFIG["max_epochs"]):
         "train/epoch_time": train_time,
         })
 
-    if avg_val_loss < best_val_loss - WANDB_CONFIG["min_delta"]:
+    if avg_val_loss < best_val_loss - config.min_delta:
         best_val_loss = avg_val_loss
         best_model_state = model.state_dict().copy()
         patience_counter = 0
@@ -221,7 +239,7 @@ for epoch in range(WANDB_CONFIG["max_epochs"]):
     else:
         patience_counter += 1
 
-    if patience_counter >= WANDB_CONFIG["patience"]:
+    if patience_counter >= config.patience:
         logger.info(f"Early stopping triggered at epoch {epoch+1}")
         break
 

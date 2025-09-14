@@ -1,4 +1,4 @@
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score # type: ignore
 from torch import nn
 import torch
 import numpy as np
@@ -15,7 +15,7 @@ import os
 # Add the project root to Python path
 sys.path.append(os.path.dirname(__file__))
 
-from experiments.ADMOD_vs_HC.POCTEP.spectral.spectral_dataset import SpectralDataset
+from core.spectral_dataset import SpectralDataset
 
 def get_device() -> torch.device:
     """Get the best available device."""
