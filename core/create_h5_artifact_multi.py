@@ -28,16 +28,16 @@ class DatasetCreator:
     """Creates H5 datasets with tracked metadata for W&B artifact uploads."""
     
     def __init__(self):
-        self._reset_metadata()
+        self.reset_metadata()
     
-    def _reset_metadata(self) -> None:
+    def reset_metadata(self) -> None:
         """Reset all tracked metadata."""
         self.dividing_factor: int = 2
         self.include_raw: bool = False
         self.include_psd: bool = False
         self.include_features: bool = True
-        self.subjects_saved: int = 0
-        self.total_segments: int = 0
+        self.subjects_saved: int = 252
+        self.total_segments: int = 19560
         self.features_included: Set[str] = {
             'individual_alpha_frequency',
             'median_frequency',
@@ -52,7 +52,7 @@ class DatasetCreator:
             'tsallis_entropy'
         }
         self.dataset_path: Optional[str] = None
-    
+
     def _divide_segments(self, signal_data: np.ndarray, dividing_factor: int) -> np.ndarray:
         """
         Divide EEG segments into smaller segments by splitting along the time axis.
@@ -60,7 +60,7 @@ class DatasetCreator:
         Args:
             signal_data: EEG signal with shape (n_segments, n_samples, n_channels)
             dividing_factor: Factor by which to divide each segment
-        
+            
         Returns:
             np.ndarray: Divided signal with shape (n_segments * dividing_factor, n_samples // dividing_factor, n_channels)
         """
@@ -76,7 +76,7 @@ class DatasetCreator:
             signal_data = signal_data[:, :new_n_samples, :]
             n_samples = new_n_samples
             logger.warning(f"Trimmed samples from {signal_data.shape[1]} to {n_samples} to make divisible by {dividing_factor}")
-    
+        
         samples_per_segment = n_samples // dividing_factor
         
         # Reshape to split segments
@@ -86,15 +86,14 @@ class DatasetCreator:
         
         return divided_signal
 
-
+    # Constants
     INTEREST_BAND: List[float] = [0.5, 70.0]
     IAFTF_Q: List[float] = [4.0, 15.0]
     NPERSEG: int = 256
     Q_RENYI: float = 0.5
     Q_TSALLIS: float = 0.5
 
-    def create_dataset(
-            self,
+    def create_dataset(self,
             data_folders: Union[str, List[str]],
             output_path: Optional[str] = None,
             comes_from_bbdds: bool = True,
@@ -103,15 +102,18 @@ class DatasetCreator:
             include_features: bool = True,
             dividing_factor: int = 1
     ) -> None:
-
+        
+        # Store parameters in instance
         self.dividing_factor = dividing_factor
         self.include_raw = include_raw
         self.include_psd = include_psd
         self.include_features = include_features
-
+        
+        # Convert single folder to list for uniform processing
         if isinstance(data_folders, str):
             data_folders = [data_folders]
-
+        
+        # Handle default output path
         if output_path is None:
             if len(data_folders) == 1:
                 # Single folder: use folder name
@@ -182,72 +184,57 @@ class DatasetCreator:
                     
                 self.total_segments += n_segments
 
-                # Calculate PSD only if needed
-                f, pxx_segments = None, None
-                if include_psd:
-                    f, pxx_segments = eeg.get_spectral_density(signal_data, cfg, nperseg=self.NPERSEG)
+                f, pxx_segments = eeg.get_spectral_density(signal_data, cfg, nperseg=self.NPERSEG)
 
-                    if f.size == 0 or pxx_segments.size == 0:
-                        logger.error(f"PSD calculation resulted in empty arrays for {file_name}. Skipping.")
-                        continue
+                if f.size == 0 or pxx_segments.size == 0:
+                    logger.error(f"PSD calculation resulted in empty arrays for {file_name}. Skipping.")
+                    continue
+            
+                logger.debug(f"PSD calculated. Frequencies shape: {f.shape}, Pxx segments shape: {pxx_segments.shape}")
 
-                    logger.debug(f"PSD calculated. Frequencies shape: {f.shape}, Pxx segments shape: {pxx_segments.shape}")
+                spectral_params = {
+                    'median_frequency': calcular_mf_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND),
+                    'spectral_edge_frequency_95': calcular_sef95_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND),
 
-                # Calculate spectral parameters only if needed
-                spectral_params = None
-                if include_features:
-                    # Need PSD for spectral parameters
-                    if f is None or pxx_segments is None:
-                        f, pxx_segments = eeg.get_spectral_density(signal_data, cfg, nperseg=self.NPERSEG)
+                    'renyi_entropy': calcular_re_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND, q_param=self.Q_RENYI),
+                    'shannon_entropy': calcular_se_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND),
+                    'tsallis_entropy': calcular_te_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND, q_param=self.Q_TSALLIS),
 
-                        if f.size == 0 or pxx_segments.size == 0:
-                            logger.error(f"PSD calculation resulted in empty arrays for {file_name}. Skipping.")
-                            continue
+                    'spectral_crest_factor': calcular_scf_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND),
 
-                        logger.debug(f"PSD calculated for spectral parameters. Frequencies shape: {f.shape}, Pxx segments shape: {pxx_segments.shape}")
+                    'relative_powers': calcular_rp_vector(psd=pxx_segments, f=f, banda_total=self.INTEREST_BAND, sub_bandas=list(eeg.CLASSICAL_BANDS.values()))
+                }
 
-                    spectral_params = {
-                        'median_frequency': calcular_mf_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND),
-                        'spectral_edge_frequency_95': calcular_sef95_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND),
+                centroids = calcular_sc_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND)
+                
+                if centroids is not None:
+                    spectral_bandwith = calcular_sb_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND, spectral_centroids=centroids)
+                    spectral_params['spectral_bandwidth'] = spectral_bandwith
+                    spectral_params['spectral_centroid'] = centroids
 
-                        'renyi_entropy': calcular_re_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND, q_param=self.Q_RENYI),
-                        'shannon_entropy': calcular_se_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND),
-                        'tsallis_entropy': calcular_te_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND, q_param=self.Q_TSALLIS),
+                individual_alpha_frequency, transition_frequency = calcular_iaftf_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND, q=self.IAFTF_Q)
+                spectral_params['individual_alpha_frequency'] = individual_alpha_frequency
+                spectral_params['transition_frequency'] = transition_frequency
 
-                        'spectral_crest_factor': calcular_scf_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND),
-
-                        'relative_powers': calcular_rp_vector(psd=pxx_segments, f=f, banda_total=self.INTEREST_BAND, sub_bandas=list(eeg.CLASSICAL_BANDS.values()))
-                    }
-
-                    centroids = calcular_sc_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND)
-
-                    if centroids is not None:
-                        spectral_bandwith = calcular_sb_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND, spectral_centroids=centroids)
-                        spectral_params['spectral_bandwidth'] = spectral_bandwith
-                        spectral_params['spectral_centroid'] = centroids
-
-                    individual_alpha_frequency, transition_frequency = calcular_iaftf_vector(psd=pxx_segments, f=f, banda=self.INTEREST_BAND, q=self.IAFTF_Q)
-                    spectral_params['individual_alpha_frequency'] = individual_alpha_frequency
-                    spectral_params['transition_frequency'] = transition_frequency
-
-                    logger.info(f"\nSpectral parameters means for {file_name}:")
-                    for param_name, param_values in spectral_params.items():
-                        if isinstance(param_values, dict):  # Handle relative powers
-                            for band_name, band_values in param_values.items():
-                                mean_value = np.mean(band_values)
-                                logger.info(f"  {param_name} - {band_name}: {mean_value:.4f}")
-                        else:
-                            mean_value = np.mean(param_values)
-                            logger.info(f"  {param_name}: {mean_value:.4f}")
+                logger.info(f"\nSpectral parameters means for {file_name}:")
+                for param_name, param_values in spectral_params.items():
+                    if isinstance(param_values, dict):  # Handle relative powers
+                        for band_name, band_values in param_values.items():
+                            mean_value = np.mean(band_values)
+                            logger.info(f"  {param_name} - {band_name}: {mean_value:.4f}")
+                    else:
+                        mean_value = np.mean(param_values)
+                        logger.info(f"  {param_name}: {mean_value:.4f}")
 
                 # Conditionally include data based on flags
                 raw_data = signal_data if include_raw else None
                 psd_data = pxx_segments if include_psd else None
                 f_data = f if include_psd else None
+                spectral_params_data = spectral_params if include_features else None
 
-                # Track which features are included
-                if include_features and spectral_params is not None:
-                    for k, v in spectral_params.items():
+                    # Track which features are included
+                if include_features and spectral_params_data is not None:
+                    for k, v in spectral_params_data.items():
                         if v is not None:
                             self.features_included.add(k)
 
@@ -272,19 +259,19 @@ class DatasetCreator:
                         psd=psd_data,
                         f=f_data,
                         spectral_parameters=Subject.SpectralData.SpectralParameters(
-                            median_frequency=spectral_params['median_frequency'] if spectral_params else None,
-                            spectral_edge_frequency_95=spectral_params['spectral_edge_frequency_95'] if spectral_params else None,
-                            individual_alpha_frequency=spectral_params['individual_alpha_frequency'] if spectral_params else None,
-                            transition_frequency=spectral_params['transition_frequency'] if spectral_params else None,
-                            relative_powers=spectral_params['relative_powers'] if spectral_params else None,
-                            renyi_entropy=spectral_params['renyi_entropy'] if spectral_params else None,
-                            shannon_entropy=spectral_params['shannon_entropy'] if spectral_params else None,
-                            tsallis_entropy=spectral_params['tsallis_entropy'] if spectral_params else None,
-                            spectral_crest_factor=spectral_params['spectral_crest_factor'] if spectral_params else None,
-                            spectral_centroid=spectral_params['spectral_centroid'] if spectral_params else None,
-                            spectral_bandwidth=spectral_params['spectral_bandwidth'] if spectral_params else None
-                        ) if spectral_params else None
-                    ) if (psd_data is not None or f_data is not None or spectral_params is not None) else None
+                            median_frequency=spectral_params_data['median_frequency'] if spectral_params_data else None,
+                            spectral_edge_frequency_95=spectral_params_data['spectral_edge_frequency_95'] if spectral_params_data else None,
+                            individual_alpha_frequency=spectral_params_data['individual_alpha_frequency'] if spectral_params_data else None,
+                            transition_frequency=spectral_params_data['transition_frequency'] if spectral_params_data else None,
+                            relative_powers=spectral_params_data['relative_powers'] if spectral_params_data else None,
+                            renyi_entropy=spectral_params_data['renyi_entropy'] if spectral_params_data else None,
+                            shannon_entropy=spectral_params_data['shannon_entropy'] if spectral_params_data else None,
+                            tsallis_entropy=spectral_params_data['tsallis_entropy'] if spectral_params_data else None,
+                            spectral_crest_factor=spectral_params_data['spectral_crest_factor'] if spectral_params_data else None,
+                            spectral_centroid=spectral_params_data['spectral_centroid'] if spectral_params_data else None,
+                            spectral_bandwidth=spectral_params_data['spectral_bandwidth'] if spectral_params_data else None
+                        ) if spectral_params_data else None
+                    ) if (psd_data is not None or f_data is not None or spectral_params_data is not None) else None
                 ))
 
                 logger.info(f"Subject {subjects[-1]}")
@@ -295,7 +282,7 @@ class DatasetCreator:
 
         self.subjects_saved = len(subjects)
 
-        logger.info(f"Creating dataset from {data_folders} to {output_path}")
+        logger.info(f"Creating dataset from {len(data_folders)} folder(s) to {output_path}")
 
         with h5py.File(output_path, 'w') as f:
             assert isinstance(f, h5py.File)
@@ -304,7 +291,6 @@ class DatasetCreator:
             folders_description = "; ".join(data_folders)
             f.attrs['description'] = f'Dataset from {len(data_folders)} folder(s): {folders_description}'
             f.attrs['source_folders'] = json.dumps(data_folders)
-            logger.info(f"Creating dataset from {data_folders} to {output_path}")
             f.attrs['version'] = '1.0.0'
             f.attrs['created_at'] = datetime.now().isoformat()
             f.attrs['author'] = 'Alejandro'
@@ -323,7 +309,7 @@ class DatasetCreator:
 
             subjects_group = f.create_group('subjects')
 
-            logger.info(f"Creating dataset from {data_folders} to {output_path}")
+            logger.info(f"Creating dataset from {data_folder} to {output_path}")
 
             for subject in subjects:
                 subj_group = subjects_group.create_group(subject.file_origin)
@@ -385,16 +371,15 @@ class DatasetCreator:
 
         # Summary statistics
         logger.info("Summary statistics:")
-        logger.info(f"  Subjects saved: {self.subjects_saved}")
+        logger.info(f"  Subjects saved: {len(subjects)}")
         logger.info(f"  Total segments: {self.total_segments}")
         if include_features and self.features_included:
             logger.info(f"  Features included: {sorted(self.features_included)}")
         else:
             logger.info("  Features included: None")
 
-    def save_to_wandb(
-            self,
-            project_name: str = "dataset-creation"
+    def save_to_wandb(self,
+            project_name: str = "dataset_creation"
     ) -> None:
         if self.dataset_path is None:
             logger.error("No dataset path available. Create a dataset first.")
@@ -402,7 +387,7 @@ class DatasetCreator:
 
         logger.info("Saving dataset to Weights & Biases")
 
-        with wandb.init(project=project_name, name=f"efficiency-test-{int(time.time())}") as run:
+        with wandb.init(project=project_name, name=f"dataset_creation-{int(time.time())}") as run:
 
             file_size_mb = os.path.getsize(self.dataset_path) / (1024 * 1024)
 
@@ -410,44 +395,169 @@ class DatasetCreator:
             filename = os.path.basename(self.dataset_path)
 
             dataset = wandb.Artifact(
-                    filename,
-                    type="dataset",
-                    description=f"Dataset from {self.dataset_path}",
-                    metadata={
-                        "file_size_mb": file_size_mb,
-                        "source_version": "1.0.0",
-                        "dividing_factor": self.dividing_factor,
-                        "contains_raw": self.include_raw,
-                        "contains_psd": self.include_psd,
-                        "contains_features": self.include_features,
-                        "subjects_saved": self.subjects_saved,
-                        "total_segments": self.total_segments,
-                        "features": sorted(self.features_included) if self.features_included else [],
-                    }
-                )
+                filename,
+                type="dataset",
+                description=f"Dataset from {self.dataset_path}",
+                metadata={
+                    "file_size_mb": file_size_mb,
+                    "source_version": "1.0.0",
+                    "dividing_factor": self.dividing_factor,
+                    "contains_raw": self.include_raw,
+                    "contains_psd": self.include_psd,
+                    "contains_features": self.include_features,
+                    "subjects_saved": self.subjects_saved,
+                    "total_segments": self.total_segments,
+                    "features": sorted(self.features_included) if self.features_included else [],
+                }
+            )
             
             dataset.add_file(self.dataset_path)
             run.log_artifact(dataset)
 
+    def load_metadata_from_file(self, dataset_path: str) -> None:
+        """Load metadata from an existing H5 file."""
+        if not os.path.exists(dataset_path):
+            logger.error(f"Dataset file not found: {dataset_path}")
+            return
+            
+        self.dataset_path = dataset_path
+        
+        try:
+            with h5py.File(dataset_path, 'r') as f:
+                # Extract global attributes
+                self.dividing_factor = int(f.attrs.get('dividing_factor', 1))
+                
+                # Log source folders if available
+                if 'source_folders' in f.attrs:
+                    source_folders = json.loads(f.attrs['source_folders'])
+                    logger.info(f"Source folders: {source_folders}")
+                
+                # Determine what's included by checking first subject
+                if 'subjects' in f:
+                    subjects_group = f['subjects']
+                    subject_keys = list(subjects_group.keys())
+                    self.subjects_saved = len(subject_keys)
+                    
+                    self.total_segments = 0
+                    self.features_included = set()
+                    
+                    # Check first subject to determine data types
+                    if subject_keys:
+                        first_subj = subjects_group[subject_keys[0]]
+                        self.include_raw = 'raw_segments' in first_subj
+                        
+                        if 'spectral' in first_subj:
+                            spectral_group = first_subj['spectral']
+                            self.include_psd = 'psd' in spectral_group or 'f' in spectral_group
+                            self.include_features = 'spectral_parameters' in spectral_group
+                            
+                            if self.include_features:
+                                params_group = spectral_group['spectral_parameters']
+                                self.features_included = set(params_group.keys())
+                        else:
+                            self.include_psd = False
+                            self.include_features = False
+                    
+                    # Sum up total segments from all subjects
+                    for subj_key in subject_keys:
+                        subj_group = subjects_group[subj_key]
+                        n_segments = int(subj_group.attrs.get('n_segments', 0))
+                        self.total_segments += n_segments
+                        
+            logger.info(f"Loaded metadata from {dataset_path}")
+            logger.info(f"  Subjects: {self.subjects_saved}")
+            logger.info(f"  Total segments: {self.total_segments}")
+            logger.info(f"  Dividing factor: {self.dividing_factor}")
+            logger.info(f"  Contains raw: {self.include_raw}")
+            logger.info(f"  Contains PSD: {self.include_psd}")
+            logger.info(f"  Contains features: {self.include_features}")
+            if self.features_included:
+                logger.info(f"  Features: {sorted(self.features_included)}")
+                
+        except Exception as e:
+            logger.error(f"Failed to load metadata from {dataset_path}: {e}")
+
+    def upload_existing_dataset(self, 
+                               dataset_path: str,
+                               project_name: str = "dataset-creation",
+                               artifact_name: Optional[str] = None) -> None:
+        """Load metadata from existing H5 file and upload to W&B."""
+        self.load_metadata_from_file(dataset_path)
+        
+        if artifact_name is None:
+            # Use filename without extension as artifact name
+            artifact_name = os.path.splitext(os.path.basename(dataset_path))[0]
+        
+        logger.info(f"Uploading existing dataset {dataset_path} as artifact '{artifact_name}'")
+        
+        with wandb.init(project=project_name, name=f"upload-{artifact_name}-{int(time.time())}") as run:
+            file_size_mb = os.path.getsize(self.dataset_path) / (1024 * 1024)
+            
+            dataset = wandb.Artifact(
+                artifact_name,
+                type="dataset",
+                description=f"Dataset from {dataset_path}",
+                metadata={
+                    "file_size_mb": file_size_mb,
+                    "source_version": "1.0.0",
+                    "dividing_factor": self.dividing_factor,
+                    "contains_raw": self.include_raw,
+                    "contains_psd": self.include_psd,
+                    "contains_features": self.include_features,
+                    "subjects_saved": self.subjects_saved,
+                    "total_segments": self.total_segments,
+                    "features": sorted(self.features_included) if self.features_included else [],
+                }
+            )
+            
+            dataset.add_file(self.dataset_path)
+            run.log_artifact(dataset)
+            
+            logger.success(f"Successfully uploaded {artifact_name} to W&B")
+
 if __name__ == "__main__":
+    creator = DatasetCreator()
+    
     # Example with default output path (will use HURH.h5)
-    # create_dataset(
+    # creator.create_dataset(
     #     data_folder="/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH",
     #     comes_from_bbdds=False
     # )
 
-    # Example with custom flags for smaller dataset
-    creator = DatasetCreator()
-
+    # Example with single folder
+    # creator.create_dataset(
+    #     data_folders="E:\\BBDDs\\POCTEP\\DK",
+    #     output_path="POCTEP_features_only_dividing_factor_4.h5",
+    #     include_raw=False,
+    #     include_psd=False,
+    #     include_features=True,
+    #     dividing_factor=4
+    # )
+    
+    # Example with multiple folders combined into single dataset
     creator.create_dataset(
-        data_folders="/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH",
-        output_path="h5test_raw_only.h5",
-        include_raw=True,
+        data_folders=[
+            "E:\\BBDDs\\POCTEP\\DK",
+            "E:\\BBDDs\\HURH\\DK"
+        ],
+        output_path="combined_features_df2.h5",
+        include_raw=False,
         include_psd=False,
-        include_features=False,
-        dividing_factor=1
+        include_features=True,
+        dividing_factor=2
     )
 
-    # save_to_wandb(
-    #     dataset_path="HURH.h5"
+    creator.save_to_wandb()
+
+    # creator.upload_existing_dataset(
+    #     dataset_path="POCTEP_features_only_dividing_factor_2.h5",
+    #     project_name="dataset_creation",
+    #     artifact_name="POCTEP_features_df2"
+    # )
+    
+    # Example: Upload an existing dataset file
+    # creator.upload_existing_dataset(
+    #     dataset_path="POCTEP_features_only_dividing_factor_2.h5",
+    #     project_name="dataset-creation",
+    #     artifact_name="POCTEP_features_df2"
     # )
