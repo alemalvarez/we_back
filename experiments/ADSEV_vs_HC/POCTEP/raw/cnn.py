@@ -64,13 +64,13 @@ device = get_device()
 logger.info(f"Using device: {device}")
 
 training_dataset = RawDataset(
-    h5_file_path="h5test_raw_only.h5",
+    h5_file_path="POCTEP_raw_only.h5",
     subjects_txt_path="experiments/ADSEV_vs_HC/POCTEP/raw/splits/training_subjects.txt",
     normalize=config.normalize
 )
 
 validation_dataset = RawDataset(
-    h5_file_path="h5test_raw_only.h5",
+    h5_file_path="POCTEP_raw_only.h5",
     subjects_txt_path="experiments/ADSEV_vs_HC/POCTEP/raw/splits/validation_subjects.txt",
     normalize=config.normalize
 )
@@ -99,8 +99,8 @@ logger.success("Optimizer ready")
 total_params = sum(p.numel() for p in model.parameters())
 trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-logger.success("Total parameters: %d", total_params)
-logger.success("Trainable parameters: %d", trainable_params)
+logger.success(f"Total parameters: {total_params}")
+logger.success(f"Trainable parameters: {trainable_params}")
 
 best_val_loss = float('inf')
 patience_counter = 0
@@ -120,8 +120,8 @@ for epoch in range(config.max_epochs):
     
     for batch_idx, (data, target) in enumerate(train_loader):
         # Move batch to device
-        data, target = data.to(device), target.to(device)
-        outputs = model(data).squeeze()
+        data, target = data.to(device), target.to(device).float()
+        outputs = model(data).squeeze(1)
         loss = criterion(outputs, target)
 
         optimizer.zero_grad()
@@ -142,8 +142,8 @@ for epoch in range(config.max_epochs):
     val_total = 0
     with torch.no_grad():
         for data, target in validation_loader_no_shuffle:  # Use unshuffled for consistent metrics
-            data, target = data.to(device), target.to(device)
-            outputs = model(data).squeeze()
+            data, target = data.to(device), target.to(device).float()
+            outputs = model(data).squeeze(1)
             loss = criterion(outputs, target)
             val_loss += loss.item()
             predictions = (outputs > 0.5).float()
@@ -190,7 +190,7 @@ y_true_list = []
 with torch.no_grad():
     for data, target in validation_loader_no_shuffle:
         data, target = data.to(device), target.to(device)
-        outputs = model(data).squeeze()
+        outputs = model(data).squeeze(1)
         y_pred_proba_list.extend(outputs.cpu().numpy())
 
         predictions = (outputs > 0.5).float()
