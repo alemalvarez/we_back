@@ -121,47 +121,63 @@ def create_dataset(
                 
             total_segments += n_segments
 
-            f, pxx_segments = eeg.get_spectral_density(signal_data, cfg, nperseg=NPERSEG)
+            # Calculate PSD only if needed
+            f, pxx_segments = None, None
+            if include_psd:
+                f, pxx_segments = eeg.get_spectral_density(signal_data, cfg, nperseg=NPERSEG)
 
-            if f.size == 0 or pxx_segments.size == 0:
-                logger.error(f"PSD calculation resulted in empty arrays for {file_name}. Skipping.")
-                continue
-            
-            logger.debug(f"PSD calculated. Frequencies shape: {f.shape}, Pxx segments shape: {pxx_segments.shape}")
+                if f.size == 0 or pxx_segments.size == 0:
+                    logger.error(f"PSD calculation resulted in empty arrays for {file_name}. Skipping.")
+                    continue
 
-            spectral_params = {
-                'median_frequency': calcular_mf_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND),
-                'spectral_edge_frequency_95': calcular_sef95_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND),
+                logger.debug(f"PSD calculated. Frequencies shape: {f.shape}, Pxx segments shape: {pxx_segments.shape}")
 
-                'renyi_entropy': calcular_re_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND, q_param=Q_RENYI),
-                'shannon_entropy': calcular_se_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND),
-                'tsallis_entropy': calcular_te_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND, q_param=Q_TSALLIS),
+            # Calculate spectral parameters only if needed
+            spectral_params = None
+            if include_features:
+                # Need PSD for spectral parameters
+                if f is None or pxx_segments is None:
+                    f, pxx_segments = eeg.get_spectral_density(signal_data, cfg, nperseg=NPERSEG)
 
-                'spectral_crest_factor': calcular_scf_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND),
+                    if f.size == 0 or pxx_segments.size == 0:
+                        logger.error(f"PSD calculation resulted in empty arrays for {file_name}. Skipping.")
+                        continue
 
-                'relative_powers': calcular_rp_vector(psd=pxx_segments, f=f, banda_total=INTEREST_BAND, sub_bandas=list(eeg.CLASSICAL_BANDS.values()))
-            }
+                    logger.debug(f"PSD calculated for spectral parameters. Frequencies shape: {f.shape}, Pxx segments shape: {pxx_segments.shape}")
 
-            centroids = calcular_sc_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND)
-            
-            if centroids is not None:
-                spectral_bandwith = calcular_sb_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND, spectral_centroids=centroids)
-                spectral_params['spectral_bandwidth'] = spectral_bandwith
-                spectral_params['spectral_centroid'] = centroids
+                spectral_params = {
+                    'median_frequency': calcular_mf_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND),
+                    'spectral_edge_frequency_95': calcular_sef95_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND),
 
-            individual_alpha_frequency, transition_frequency = calcular_iaftf_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND, q=IAFTF_Q)
-            spectral_params['individual_alpha_frequency'] = individual_alpha_frequency
-            spectral_params['transition_frequency'] = transition_frequency
+                    'renyi_entropy': calcular_re_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND, q_param=Q_RENYI),
+                    'shannon_entropy': calcular_se_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND),
+                    'tsallis_entropy': calcular_te_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND, q_param=Q_TSALLIS),
 
-            logger.info(f"\nSpectral parameters means for {file_name}:")
-            for param_name, param_values in spectral_params.items():
-                if isinstance(param_values, dict):  # Handle relative powers
-                    for band_name, band_values in param_values.items():
-                        mean_value = np.mean(band_values)
-                        logger.info(f"  {param_name} - {band_name}: {mean_value:.4f}")
-                else:
-                    mean_value = np.mean(param_values)
-                    logger.info(f"  {param_name}: {mean_value:.4f}")
+                    'spectral_crest_factor': calcular_scf_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND),
+
+                    'relative_powers': calcular_rp_vector(psd=pxx_segments, f=f, banda_total=INTEREST_BAND, sub_bandas=list(eeg.CLASSICAL_BANDS.values()))
+                }
+
+                centroids = calcular_sc_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND)
+
+                if centroids is not None:
+                    spectral_bandwith = calcular_sb_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND, spectral_centroids=centroids)
+                    spectral_params['spectral_bandwidth'] = spectral_bandwith
+                    spectral_params['spectral_centroid'] = centroids
+
+                individual_alpha_frequency, transition_frequency = calcular_iaftf_vector(psd=pxx_segments, f=f, banda=INTEREST_BAND, q=IAFTF_Q)
+                spectral_params['individual_alpha_frequency'] = individual_alpha_frequency
+                spectral_params['transition_frequency'] = transition_frequency
+
+                logger.info(f"\nSpectral parameters means for {file_name}:")
+                for param_name, param_values in spectral_params.items():
+                    if isinstance(param_values, dict):  # Handle relative powers
+                        for band_name, band_values in param_values.items():
+                            mean_value = np.mean(band_values)
+                            logger.info(f"  {param_name} - {band_name}: {mean_value:.4f}")
+                    else:
+                        mean_value = np.mean(param_values)
+                        logger.info(f"  {param_name}: {mean_value:.4f}")
 
             # Conditionally include data based on flags
             raw_data = signal_data if include_raw else None
@@ -170,8 +186,8 @@ def create_dataset(
             spectral_params_data = spectral_params if include_features else None
 
             # Track which features are included
-            if include_features and spectral_params_data is not None:
-                for k, v in spectral_params_data.items():
+            if include_features and spectral_params is not None:
+                for k, v in spectral_params.items():
                     if v is not None:
                         features_included.add(k)
 
@@ -196,19 +212,19 @@ def create_dataset(
                     psd=psd_data,
                     f=f_data,
                     spectral_parameters=Subject.SpectralData.SpectralParameters(
-                        median_frequency=spectral_params_data['median_frequency'] if spectral_params_data else None,
-                        spectral_edge_frequency_95=spectral_params_data['spectral_edge_frequency_95'] if spectral_params_data else None,
-                        individual_alpha_frequency=spectral_params_data['individual_alpha_frequency'] if spectral_params_data else None,
-                        transition_frequency=spectral_params_data['transition_frequency'] if spectral_params_data else None,
-                        relative_powers=spectral_params_data['relative_powers'] if spectral_params_data else None,
-                        renyi_entropy=spectral_params_data['renyi_entropy'] if spectral_params_data else None,
-                        shannon_entropy=spectral_params_data['shannon_entropy'] if spectral_params_data else None,
-                        tsallis_entropy=spectral_params_data['tsallis_entropy'] if spectral_params_data else None,
-                        spectral_crest_factor=spectral_params_data['spectral_crest_factor'] if spectral_params_data else None,
-                        spectral_centroid=spectral_params_data['spectral_centroid'] if spectral_params_data else None,
-                        spectral_bandwidth=spectral_params_data['spectral_bandwidth'] if spectral_params_data else None
-                    ) if spectral_params_data else None
-                ) if (psd_data is not None or f_data is not None or spectral_params_data is not None) else None
+                        median_frequency=spectral_params['median_frequency'] if spectral_params else None,
+                        spectral_edge_frequency_95=spectral_params['spectral_edge_frequency_95'] if spectral_params else None,
+                        individual_alpha_frequency=spectral_params['individual_alpha_frequency'] if spectral_params else None,
+                        transition_frequency=spectral_params['transition_frequency'] if spectral_params else None,
+                        relative_powers=spectral_params['relative_powers'] if spectral_params else None,
+                        renyi_entropy=spectral_params['renyi_entropy'] if spectral_params else None,
+                        shannon_entropy=spectral_params['shannon_entropy'] if spectral_params else None,
+                        tsallis_entropy=spectral_params['tsallis_entropy'] if spectral_params else None,
+                        spectral_crest_factor=spectral_params['spectral_crest_factor'] if spectral_params else None,
+                        spectral_centroid=spectral_params['spectral_centroid'] if spectral_params else None,
+                        spectral_bandwidth=spectral_params['spectral_bandwidth'] if spectral_params else None
+                    ) if spectral_params else None
+                ) if (psd_data is not None or f_data is not None or spectral_params is not None) else None
             ))
 
             logger.info(f"Subject {subjects[-1]}")
