@@ -14,6 +14,9 @@ from typing import Literal
 from core.spectral_dataset import SpectralDataset
 from models.spectral_net import SpectralNet
 
+import matplotlib.pyplot as plt
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+
 # Configuration constants
 WANDB_PROJECT = "ADSEV_vs_HC"
 WANDB_CONFIG = {
@@ -284,8 +287,7 @@ logger.warning(f"Total misclassified samples: {len(missclassified_indexes)} out 
 for i, idx in enumerate(missclassified_indexes):
     logger.warning(f"Missclassified sample {i+1}/{len(missclassified_indexes)} - Index {idx}: {validation_dataset.get_sample_to_subject(idx)}. Was classified as {y_pred[idx]} but should have been {y_true[idx]}")
 
-import matplotlib.pyplot as plt
-from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
+
 
 cm = confusion_matrix(y_true, y_pred)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm)

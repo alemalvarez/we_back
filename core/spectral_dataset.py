@@ -17,7 +17,7 @@ class SpectralDataset(Dataset):
         labels_list = []
         self.sample_to_subject: List[str] = []
 
-        logger.info(f"Loading dataset from {h5_file_path} with {len(self.subject_ids)} subjects")
+        logger.info(f"Loading features dataset from {h5_file_path} with {len(self.subject_ids)} subjects")
 
         with h5py.File(h5_file_path, 'r') as f:
             for subj_key in self.subject_ids:

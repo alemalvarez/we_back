@@ -347,11 +347,11 @@ if __name__ == "__main__":
     # Example with custom flags for smaller dataset
     create_dataset(
         data_folder="/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH",
-        output_path="h5test_features_only_dividing_factor_10.h5",
-        include_raw=False,
+        output_path="h5test_raw_only.h5",
+        include_raw=True,
         include_psd=False,
-        include_features=True,
-        dividing_factor=10
+        include_features=False,
+        dividing_factor=1
     )
 
     # save_to_wandb(
