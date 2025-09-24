@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 import numpy as np
 from typing import Optional
+from loguru import logger
+import dataclasses
+
 
 @dataclass 
 class Subject:
@@ -105,3 +108,20 @@ class Subject:
 
         result += ")"
         return result
+
+@dataclass
+class BaseModelConfig:
+    random_seed: int
+    model_name: str
+    learning_rate: float
+    batch_size: int
+    max_epochs: int
+    patience: int
+    min_delta: float
+
+    def __post_init__(self):
+        """Log the configuration parameters after initialization."""
+        logger.info(f"Initialized configuration for '{self.model_name}':")
+        for field in dataclasses.fields(self):
+            value = getattr(self, field.name)
+            logger.info(f"  > {field.name}: {value}")
