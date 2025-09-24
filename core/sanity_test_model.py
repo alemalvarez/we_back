@@ -86,7 +86,7 @@ def sanity_test_model(
     if model_inference_event:
         time_per_batch_us = 0.0
         if device.type == 'cuda':
-            time_per_batch_us = model_inference_event.cuda_time_total
+            time_per_batch_us = model_inference_event.device_time_total
         else:
             time_per_batch_us = model_inference_event.cpu_time_total
         

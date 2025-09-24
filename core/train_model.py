@@ -107,8 +107,8 @@ def train_model(
             break
 
         logger.info(f"Epoch {epoch+1}/{config.max_epochs} completed in {results.train_time:.4f} seconds")
-        logger.info(f"Train Loss: {results.train_loss:.4f}, Train Accuracy: {results.train_accuracy:.2f}%")
-        logger.info(f"Validation Loss: {results.val_loss:.4f}, Validation Accuracy: {results.val_accuracy:.2f}%")
+        logger.info(f"Train Loss: {results.train_loss:.4f}, Train Accuracy: {results.train_accuracy:.2f}")
+        logger.info(f"Validation Loss: {results.val_loss:.4f}, Validation Accuracy: {results.val_accuracy:.2f}")
         logger.info("="*100)
 
         if results.val_loss < best_val_loss - config.min_delta:
