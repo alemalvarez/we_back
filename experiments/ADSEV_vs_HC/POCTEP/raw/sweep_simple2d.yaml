@@ -61,7 +61,7 @@ parameters:
     value: 50
 
   patience:
-    value: 20
+    value: 10
 
   min_delta:
     value: 0.001
