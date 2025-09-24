@@ -16,6 +16,10 @@ from collections import Counter
 import h5py  # type: ignore[import]
 import numpy as np
 from sklearn.model_selection import train_test_split  # type: ignore[import]
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent
@@ -135,10 +139,10 @@ def main():
     """Main function to create the dataset splits."""
 
     # Configuration
-    h5_path = "h5test_raw_only.h5"
+    h5_path = os.getenv("H5_FILE_PATH")
     # Save splits to a sibling folder named "splits" relative to this script
     output_dir = str((Path(__file__).parent / "splits").resolve())
-    random_state = 42
+    random_state = int(os.getenv("RANDOM_SEED"))
 
     # Split ratios
     train_ratio = 0.7
@@ -191,8 +195,6 @@ def main():
     save_split_to_file(test_subjects, "test_subjects.txt", output_dir)
 
     print("✓ All splits saved successfully!")
-
-
 
     def print_category_distribution(subjects: List[str], subjects_by_category: Dict[str, List[str]], split_name: str) -> None:
         # Build a mapping from subject to category

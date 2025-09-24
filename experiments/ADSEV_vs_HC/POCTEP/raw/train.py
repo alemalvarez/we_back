@@ -5,24 +5,18 @@ from core.raw_dataset import RawDataset
 from core.schemas import BaseModelConfig
 from models.simple_2d import Simple2D
 from core.train_model import train_model
+from dotenv import load_dotenv
+import os
+import yaml # type: ignore[import]
+from loguru import logger
 
-H5_FILE_PATH = "h5test_raw_only.h5"
+load_dotenv()
+
+H5_FILE_PATH = os.getenv("H5_FILE_PATH", "h5test_raw_only.h5")
+logger.info(f"H5 file path: {H5_FILE_PATH}")
 WANDB_PROJECT = "ADSEV_vs_HC"
-WANDB_CONFIG = {
-    "random_seed": 42,
-    "model_name": "Simple2D_3layers",
-    "n_filters": [16, 32, 64],
-    "kernel_sizes": [(5, 5), (5, 5), (5, 5)],
-    "strides": [(1, 1), (1, 1), (1, 1)],
-    "dropout_rate": 0.25,
-    "input_shape": (1000, 1, 68),
-    "learning_rate": 0.001,
-    "batch_size": 64,
-    "max_epochs": 50,
-    "patience": 20,
-    "min_delta": 0.001,
-    "normalize": "sample-channel",
-}
+WANDB_CONFIG = yaml.load(open("experiments/ADSEV_vs_HC/POCTEP/raw/simple2d.yaml"), Loader=yaml.FullLoader)
+WANDB_CONFIG["random_seed"] = int(os.getenv("RANDOM_SEED", "42"))
 
 @dataclass
 class Simple2DConfig(BaseModelConfig):
@@ -30,12 +24,10 @@ class Simple2DConfig(BaseModelConfig):
     kernel_sizes: List[Tuple[int, int]]
     strides: List[Tuple[int, int]]
     dropout_rate: float
-    input_shape: Tuple[int, int, int]
     normalize: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full']
 
-
 config = Simple2DConfig(**WANDB_CONFIG) # type: ignore
-model = Simple2D(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, input_shape=config.input_shape)
+model = Simple2D(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate)
 
 training_dataset = RawDataset(
     h5_file_path=H5_FILE_PATH,

@@ -18,11 +18,8 @@ class Simple2D(nn.Module):
         kernel_sizes: List[Tuple[int, int]],
         strides: List[Tuple[int, int]],
         dropout_rate: float,
-        input_shape: Tuple[int, int, int],
     ):
         super(Simple2D, self).__init__()
-
-        self.input_shape = input_shape
 
         self.l1 = nn.Sequential(
             nn.Conv2d(

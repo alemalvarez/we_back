@@ -84,8 +84,8 @@ def train_model(
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    logger.success(f"Total parameters: {total_params}")
-    logger.success(f"Trainable parameters: {trainable_params}")
+    logger.debug(f"Total parameters: {total_params}")
+    logger.debug(f"Trainable parameters: {trainable_params}")
 
     best_val_loss = float('inf')
     patience_counter = 0
@@ -102,9 +102,14 @@ def train_model(
             config,
         )
 
+        if results.train_time > 60:
+            logger.warning(f"Epoch {epoch+1} took {results.train_time:.2f} seconds, which is longer than a minute. Stopping training.")
+            break
+
         logger.info(f"Epoch {epoch+1}/{config.max_epochs} completed in {results.train_time:.4f} seconds")
         logger.info(f"Train Loss: {results.train_loss:.4f}, Train Accuracy: {results.train_accuracy:.2f}%")
         logger.info(f"Validation Loss: {results.val_loss:.4f}, Validation Accuracy: {results.val_accuracy:.2f}%")
+        logger.info("="*100)
 
         if results.val_loss < best_val_loss - config.min_delta:
             best_val_loss = results.val_loss
