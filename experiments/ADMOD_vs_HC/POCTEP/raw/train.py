@@ -29,6 +29,8 @@ class Simple2DConfig(BaseModelConfig):
 
 config = Simple2DConfig(**WANDB_CONFIG) # type: ignore
 model = Simple2D(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate)
+model = torch.compile(model) # type: ignore
+
 
 training_dataset = RawDataset(
     h5_file_path=H5_FILE_PATH,
