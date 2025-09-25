@@ -8,7 +8,14 @@ import torch.optim as optim
 from core.raw_dataset import RawDataset
 from models.simple_2d import Simple2D
 from loguru import logger
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score # type: ignore
+from sklearn.metrics import ( # type: ignore
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    precision_recall_curve,
+)
 import wandb
 from dotenv import load_dotenv
 import os
@@ -114,6 +121,7 @@ def main():
             epoch_start_time = time.time()
 
             for batch_idx, (data, target) in enumerate(train_loader):
+                batch_start_time = time.time()
                 data, target = data.to(device), target.to(device).float()
                 outputs = model(data).squeeze(1)
                 loss = criterion(outputs, target)
@@ -121,6 +129,11 @@ def main():
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+
+                batch_duration = time.time() - batch_start_time
+                if batch_duration > 30:
+                    logger.warning(f"Batch {batch_idx+1} took {batch_duration:.2f} seconds (>30s). Aborting run.")
+                    return
 
                 epoch_loss += loss.item()
                 predictions = (outputs > 0.5).float()
@@ -166,11 +179,14 @@ def main():
             })
 
             if avg_val_loss < best_val_loss - config.min_delta:
+                logger.success(f"New best validation loss: {avg_val_loss:.4f}")
                 best_val_loss = avg_val_loss
                 best_model_state = model.state_dict().copy()
                 patience_counter = 0
             else:
                 patience_counter += 1
+
+            logger.info(100*"=")
 
             if patience_counter >= config.patience:
                 logger.info(f"Early stopping triggered at epoch {epoch+1}")
@@ -183,7 +199,6 @@ def main():
         logger.success("Training completed")
 
         model.eval()
-        y_pred_list = []
         y_pred_proba_list = []
         y_true_list = []
         val_loss = 0.0
@@ -194,11 +209,8 @@ def main():
                 outputs = model(data).squeeze(1)
                 loss = criterion(outputs, target)
                 val_loss += loss.item()
-                predictions = (outputs > 0.5).float()
 
                 y_pred_proba_list.extend(outputs.cpu().numpy())
-                predictions = (outputs > 0.5).float()
-                y_pred_list.extend(predictions.cpu().numpy())
                 y_true_list.extend(target.cpu().numpy())
 
             avg_val_loss = val_loss / len(validation_loader)
@@ -209,9 +221,18 @@ def main():
 
         logger.info(f"Validation Loss: {avg_val_loss:.4f}")
 
-        y_pred = np.array(y_pred_list)
         y_pred_proba = np.array(y_pred_proba_list)
         y_true = np.array(y_true_list)
+
+        precisions, recalls, thresholds = precision_recall_curve(y_true, y_pred_proba)
+
+        f1s = 2 * (precisions * recalls) / (precisions + recalls + 1e-8)
+        best_idx = np.argmax(f1s)
+        best_threshold = thresholds[best_idx]
+
+        logger.info(f"Best threshold: {best_threshold:.4f}")
+
+        y_pred = (y_pred_proba > best_threshold).astype(int)
 
         final_accuracy = accuracy_score(y_true, y_pred)
         final_f1 = f1_score(y_true, y_pred)

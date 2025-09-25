@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from core.schemas import BaseModelConfig
 from loguru import logger
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score # type: ignore
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score, precision_recall_curve # type: ignore
 
 def _get_device() -> torch.device:
     if torch.cuda.is_available():
@@ -140,22 +140,29 @@ def _final_evaluation(
     validation_dataset: Dataset,
 ) -> None:
     model.eval()
-    y_pred_list = []
+    # y_pred_list = []
     y_pred_proba_list = []
     y_true_list = []
     with torch.no_grad():
         for data, target in validation_loader:
             data, target = data.to(device), target.to(device).float()
             outputs = model(data).squeeze(1)
-            predictions = (outputs > 0.5).float()
+            # predictions = (outputs > 0.5).float()
             y_pred_proba_list.extend(outputs.cpu().numpy())
-            y_pred_list.extend(predictions.cpu().numpy())
+            # y_pred_list.extend(predictions.cpu().numpy())
             y_true_list.extend(target.cpu().numpy())
-            
-    y_pred = np.array(y_pred_list)
+
+    # y_pred = np.array(y_pred_list)
     y_pred_proba = np.array(y_pred_proba_list)
     y_true = np.array(y_true_list)
     logger.info(f"Collected {len(y_true)} predictions from validation set")
+
+    precisions, recalls, thresholds = precision_recall_curve(y_true, y_pred_proba)
+    f1s = 2 * (precisions * recalls) / (precisions + recalls + 1e-8)
+    best_idx = np.argmax(f1s)
+    best_threshold = thresholds[best_idx]
+    logger.info(f"Best threshold: {best_threshold:.4f}")
+    y_pred = (y_pred_proba > best_threshold).astype(int)
 
     assert hasattr(validation_dataset, "sample_to_subject"), "Validation dataset must have a sample_to_subject attribute"
     logger.info(f"Unique subjects in validation dataset: {len(set(validation_dataset.sample_to_subject))}")
