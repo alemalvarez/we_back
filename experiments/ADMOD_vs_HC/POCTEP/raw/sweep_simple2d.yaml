@@ -76,7 +76,7 @@ parameters:
       - channel
       - full
 
-program: experiments.ADSEV_vs_HC.POCTEP.raw.sweep
+program: experiments.ADMOD_vs_HC.POCTEP.raw.sweep
 
 command:
   - ${env}
