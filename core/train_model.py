@@ -67,7 +67,6 @@ def train_model(
         training_dataset, 
         batch_size=config.batch_size, 
         shuffle=True,
-        num_workers=4,
         pin_memory=True
     )
 
