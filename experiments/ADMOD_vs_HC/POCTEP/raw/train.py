@@ -15,8 +15,8 @@ load_dotenv()
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "h5test_raw_only.h5")
 logger.info(f"H5 file path: {H5_FILE_PATH}")
-WANDB_PROJECT = "ADSEV_vs_HC"
-WANDB_CONFIG = yaml.load(open("experiments/ADSEV_vs_HC/POCTEP/raw/simple2d.yaml"), Loader=yaml.FullLoader)
+WANDB_PROJECT = "ADMOD_vs_HC"
+WANDB_CONFIG = yaml.load(open("experiments/ADMOD_vs_HC/POCTEP/raw/simple2d.yaml"), Loader=yaml.FullLoader)
 WANDB_CONFIG["random_seed"] = int(os.getenv("RANDOM_SEED", "42"))
 
 @dataclass
@@ -32,13 +32,13 @@ model = Simple2D(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, s
 
 training_dataset = RawDataset(
     h5_file_path=H5_FILE_PATH,
-    subjects_txt_path="experiments/ADSEV_vs_HC/POCTEP/raw/splits/training_subjects.txt",
+    subjects_txt_path="experiments/ADMOD_vs_HC/POCTEP/raw/splits/training_subjects.txt",
     normalize=config.normalize
 )
 
 validation_dataset = RawDataset(
     h5_file_path=H5_FILE_PATH,
-    subjects_txt_path="experiments/ADSEV_vs_HC/POCTEP/raw/splits/validation_subjects.txt",
+    subjects_txt_path="experiments/ADMOD_vs_HC/POCTEP/raw/splits/validation_subjects.txt",
     normalize=config.normalize
 )
 

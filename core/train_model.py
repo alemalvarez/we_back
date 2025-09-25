@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from core.schemas import BaseModelConfig
 from loguru import logger
+from collections import defaultdict
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score, precision_recall_curve # type: ignore
 
 def _get_device() -> torch.device:
@@ -162,9 +163,18 @@ def _final_evaluation(
     y_pred = (y_pred_proba > best_threshold).astype(int)
 
     assert hasattr(validation_dataset, "sample_to_subject"), "Validation dataset must have a sample_to_subject attribute"
-    logger.info(f"Unique subjects in validation dataset: {len(set(validation_dataset.sample_to_subject))}")
-    unique_pred_true_pairs = set(zip(y_pred, y_true))
-    logger.info(f"Unique predictions and true labels pairs: {len(unique_pred_true_pairs)}")
+    sample_to_subject = validation_dataset.sample_to_subject  # type: ignore
+    assert len(sample_to_subject) == len(y_true), "sample_to_subject length must match number of validation samples"
+    subject_correct: defaultdict[str, int] = defaultdict(int)
+    subject_wrong: defaultdict[str, int] = defaultdict(int)
+    for idx, subject in enumerate(sample_to_subject):
+        if y_pred[idx] == y_true[idx]:
+            subject_correct[subject] += 1
+        else:
+            subject_wrong[subject] += 1
+    for subject in sorted(set(sample_to_subject)):
+        logger.info(f"Subject {subject}: correct={subject_correct[subject]}, wrong={subject_wrong[subject]}")
+
     final_accuracy = accuracy_score(y_true, y_pred)
     final_f1 = f1_score(y_true, y_pred)
     final_precision = precision_score(y_true, y_pred)
