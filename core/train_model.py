@@ -66,7 +66,9 @@ def train_model(
     train_loader = DataLoader(
         training_dataset, 
         batch_size=config.batch_size, 
-        shuffle=True
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True
     )
 
     validation_loader = DataLoader(
