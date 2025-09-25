@@ -140,19 +140,16 @@ def _final_evaluation(
     validation_dataset: Dataset,
 ) -> None:
     model.eval()
-    # y_pred_list = []
-    y_pred_proba_list = []
-    y_true_list = []
+    y_pred_proba_list: list[np.ndarray] = []
+    y_true_list: list[np.ndarray] = []
     with torch.no_grad():
         for data, target in validation_loader:
             data, target = data.to(device), target.to(device).float()
-            outputs = model(data).squeeze(1)
-            # predictions = (outputs > 0.5).float()
-            y_pred_proba_list.extend(outputs.cpu().numpy())
-            # y_pred_list.extend(predictions.cpu().numpy())
+            logits = model(data).squeeze(1)
+            probabilities = torch.sigmoid(logits)
+            y_pred_proba_list.extend(probabilities.cpu().numpy())
             y_true_list.extend(target.cpu().numpy())
 
-    # y_pred = np.array(y_pred_list)
     y_pred_proba = np.array(y_pred_proba_list)
     y_true = np.array(y_true_list)
     logger.info(f"Collected {len(y_true)} predictions from validation set")
