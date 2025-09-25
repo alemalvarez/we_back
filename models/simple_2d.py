@@ -31,7 +31,7 @@ class Simple2D(nn.Module):
             ),
             nn.BatchNorm2d(n_filters[0]),
             nn.Dropout(dropout_rate),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
         )
 
         self.l2 = nn.Sequential(
@@ -44,7 +44,7 @@ class Simple2D(nn.Module):
             ),
             nn.BatchNorm2d(n_filters[1]),
             nn.Dropout(dropout_rate),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
         )
 
         self.l3 = nn.Sequential(
@@ -57,10 +57,10 @@ class Simple2D(nn.Module):
             ),
             nn.BatchNorm2d(n_filters[2]),
             nn.Dropout(dropout_rate),
-            nn.ReLU(),
+            nn.ReLU(inplace=True),
         )
 
-        self.gloval_avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
 
         self.classifier = nn.Sequential(
             nn.Linear(n_filters[2], 1),
@@ -70,11 +70,8 @@ class Simple2D(nn.Module):
         # Ensure input is (batch, channels=1, height, width)
         if x.dim() == 3:
             x = x.unsqueeze(1)
-        x = self.l1(x)
-        x = self.l2(x)
-        x = self.l3(x)
-        x = self.gloval_avg_pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.classifier(x)
-        return x
+        x = self.l3(self.l2(self.l1(x)))
+        x = self.global_avg_pool(x)
+        x = x.flatten(1)
+        return self.classifier(x)
 
