@@ -151,6 +151,7 @@ def _final_evaluation(
             y_pred_proba_list.extend(outputs.cpu().numpy())
             y_pred_list.extend(predictions.cpu().numpy())
             y_true_list.extend(target.cpu().numpy())
+            
     y_pred = np.array(y_pred_list)
     y_pred_proba = np.array(y_pred_proba_list)
     y_true = np.array(y_true_list)
@@ -227,7 +228,7 @@ def _one_epoch(
             val_correct += (predictions == target).sum().item()
             val_total += target.size(0)
 
-    avg_val_loss = val_loss / len(validation_loader)
+    avg_val_loss = val_loss / len(validation_loader) # divide by number of batches my bad (its already avgd)
     avg_val_accuracy = val_correct / val_total
 
     train_time = time.time() - epoch_start_time

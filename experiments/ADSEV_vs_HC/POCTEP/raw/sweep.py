@@ -186,6 +186,7 @@ def main():
         y_pred_list = []
         y_pred_proba_list = []
         y_true_list = []
+        val_loss = 0.0
 
         with torch.no_grad():
             for data, target in validation_loader:
@@ -194,23 +195,19 @@ def main():
                 loss = criterion(outputs, target)
                 val_loss += loss.item()
                 predictions = (outputs > 0.5).float()
-                val_correct += (predictions == target).sum().item()
-                val_total += target.size(0)
+
+                y_pred_proba_list.extend(outputs.cpu().numpy())
+                predictions = (outputs > 0.5).float()
+                y_pred_list.extend(predictions.cpu().numpy())
+                y_true_list.extend(target.cpu().numpy())
 
             avg_val_loss = val_loss / len(validation_loader)
-            avg_val_accuracy = val_correct / val_total
 
-            wandb.log({
-                "val/loss": avg_val_loss,
-                "val/accuracy": avg_val_accuracy,
-            })
+        wandb.log({
+            "val/loss": avg_val_loss,
+        })
 
-            logger.info(f"Validation Loss: {avg_val_loss:.4f}, Validation Accuracy: {avg_val_accuracy:.2f}")
-
-            y_pred_proba_list.extend(outputs.cpu().numpy())
-            predictions = (outputs > 0.5).float()
-            y_pred_list.extend(predictions.cpu().numpy())
-            y_true_list.extend(target.cpu().numpy())
+        logger.info(f"Validation Loss: {avg_val_loss:.4f}")
 
         y_pred = np.array(y_pred_list)
         y_pred_proba = np.array(y_pred_proba_list)

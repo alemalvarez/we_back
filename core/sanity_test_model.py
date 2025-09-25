@@ -7,6 +7,8 @@ from core.schemas import BaseModelConfig
 import torch.nn as nn
 import torch.profiler
 import torch.optim as optim
+import numpy as np
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score # type: ignore
 
 def _get_device() -> torch.device:
     if torch.cuda.is_available():
@@ -74,6 +76,54 @@ def sanity_test_model(
 
         loss = criterion(outputs, target)
         logger.success(f"Initial loss on one batch: {loss.item():.4f}")
+
+    model.eval()
+    y_pred_list: list[np.ndarray] = []
+    y_pred_proba_list: list[np.ndarray] = []
+    y_true_list: list[np.ndarray] = []
+    val_loss = 0.0
+    val_correct = 0
+    val_total = 0
+
+    with torch.no_grad():
+        for data, target in loader:
+            data, target = data.to(device), target.to(device).float()
+            outputs = model(data).squeeze(1)
+            loss = criterion(outputs, target)
+            val_loss += loss.item()
+            predictions = (outputs > 0.5).float()
+            val_correct += (predictions == target).sum().item()
+            val_total += target.size(0)
+
+            y_pred_proba_list.extend(outputs.cpu().numpy())
+            predictions = (outputs > 0.5).float()
+            y_pred_list.extend(predictions.cpu().numpy())
+            y_true_list.extend(target.cpu().numpy())
+
+    avg_val_loss = val_loss / len(loader)
+    avg_val_accuracy = val_correct / val_total
+    
+    logger.success(f"Final loss on validation set: {avg_val_loss:.4f}")
+    logger.success(f"Final accuracy on validation set: {avg_val_accuracy:.4f}")
+
+    y_pred = np.array(y_pred_list)
+    y_pred_proba = np.array(y_pred_proba_list)
+    y_true = np.array(y_true_list)
+
+    logger.debug(y_pred)
+    logger.debug(y_true)
+
+    final_accuracy = accuracy_score(y_true, y_pred)
+    final_f1 = f1_score(y_true, y_pred)
+    final_precision = precision_score(y_true, y_pred)
+    final_recall = recall_score(y_true, y_pred)
+    final_roc_auc = roc_auc_score(y_true, y_pred_proba)
+
+    logger.success(f"Final accuracy: {final_accuracy:.4f}")
+    logger.success(f"Final F1 score: {final_f1:.4f}")
+    logger.success(f"Final precision: {final_precision:.4f}")
+    logger.success(f"Final recall: {final_recall:.4f}")
+    logger.success(f"Final ROC AUC: {final_roc_auc:.4f}")
 
     sort_key = "self_cuda_time_total" if device.type == "cuda" else "self_cpu_time_total"
     profiler_log = prof.key_averages().table(sort_by=sort_key, row_limit=15)
