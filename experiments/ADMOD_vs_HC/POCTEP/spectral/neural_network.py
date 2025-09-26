@@ -1,3 +1,4 @@
+from collections import defaultdict
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score # type: ignore
 from torch import nn
 import torch
@@ -270,3 +271,15 @@ logger.info(f"  Precision: {precision_score(y_true, y_pred):.4f}")
 logger.info(f"  Recall: {recall_score(y_true, y_pred):.4f}")
 logger.info(f"  ROC-AUC: {roc_auc_score(y_true, y_pred_proba):.4f}")
 
+assert hasattr(validation_dataset, "sample_to_subject"), "Validation dataset must have a sample_to_subject attribute"
+sample_to_subject = validation_dataset.sample_to_subject  # type: ignore
+assert len(sample_to_subject) == len(y_true), "sample_to_subject length must match number of validation samples"
+subject_correct: defaultdict[str, int] = defaultdict(int)
+subject_wrong: defaultdict[str, int] = defaultdict(int)
+for idx, subject in enumerate(sample_to_subject):
+    if y_pred[idx] == y_true[idx]:
+        subject_correct[subject] += 1
+    else:
+        subject_wrong[subject] += 1
+for subject in sorted(set(sample_to_subject)):
+    logger.info(f"Subject {subject}: correct={subject_correct[subject]}, wrong={subject_wrong[subject]}")

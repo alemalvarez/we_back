@@ -2,7 +2,54 @@ import torch
 from torch import nn
 from typing import List, Tuple
 
-class Simple2D(nn.Module):
+class BareMinimum2D(nn.Module):
+    """Bare minimum 2D CNN for EEG data classification.
+    This is thought for taking in data with a shape like
+    (n_samples, n_channels, 1).
+    """
+    
+    def __init__(
+        self,
+        n_filters: List[int],
+        kernel_sizes: List[Tuple[int, int]],
+        strides: List[Tuple[int, int]],
+        dropout_rate: float,
+    ):
+        super(BareMinimum2D, self).__init__()
+
+        self.l1 = nn.Sequential(
+            nn.Conv2d(
+                in_channels = 1,
+                out_channels = n_filters[0],
+                kernel_size = kernel_sizes[0],
+                stride = strides[0],
+                padding = (0,0),
+            ),
+        )
+
+        self.l2 = nn.Sequential(
+            nn.Conv2d(
+                in_channels = n_filters[0],
+                out_channels = n_filters[1],
+                kernel_size = kernel_sizes[1],
+                stride = strides[1],
+                padding = (0,0),
+            ),
+        )
+
+        self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
+
+        self.classifier = nn.Sequential(
+            nn.Linear(n_filters[1], 1),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.l2(self.l1(x))
+        x = self.global_avg_pool(x)
+        x = x.flatten(1)
+        return self.classifier(x)
+
+class Simple2D3Layers(nn.Module):
     """Simple 2D CNN for EEG data classification.
     This is thought for taking in data with a shape like
     (n_samples, n_channels, 1).
@@ -19,7 +66,7 @@ class Simple2D(nn.Module):
         strides: List[Tuple[int, int]],
         dropout_rate: float,
     ):
-        super(Simple2D, self).__init__()
+        super(Simple2D3Layers, self).__init__()
 
         self.l1 = nn.Sequential(
             nn.Conv2d(

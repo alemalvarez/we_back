@@ -3,9 +3,11 @@ import json
 import os
 import time
 from typing import List, Optional, Set, Union
+import math
 
 import numpy as np
 import h5py  # type: ignore
+from scipy.signal import resample_poly  # type: ignore
 import wandb
 import core.eeg_utils as eeg
 
@@ -87,6 +89,29 @@ class DatasetCreator:
         return divided_signal
 
 
+    def _resample_segments(self, signal_data: np.ndarray, fs_in: int, fs_out: int) -> np.ndarray:
+        """Anti-aliased resampling of segments along the time axis.
+
+        Args:
+            signal_data: Array with shape (n_segments, n_samples, n_channels)
+            fs_in: Original sampling rate
+            fs_out: Target sampling rate
+
+        Returns:
+            np.ndarray: Resampled array with shape (n_segments, new_samples, n_channels)
+        """
+        if fs_in == fs_out:
+            return signal_data
+
+        up = fs_out
+        down = fs_in
+        g = math.gcd(up, down)
+        up //= g
+        down //= g
+
+        # Resample along the samples axis (axis=1)
+        return resample_poly(signal_data, up, down, axis=1)
+
     INTEREST_BAND: List[float] = [0.5, 70.0]
     IAFTF_Q: List[float] = [4.0, 15.0]
     NPERSEG: int = 256
@@ -101,7 +126,8 @@ class DatasetCreator:
             include_raw: bool = True,
             include_psd: bool = True,
             include_features: bool = True,
-            dividing_factor: int = 1
+            dividing_factor: int = 1,
+            downsampling_freq: Optional[int] = None
     ) -> None:
 
         self.dividing_factor = dividing_factor
@@ -159,6 +185,8 @@ class DatasetCreator:
         
         subjects: List[Subject] = []
         
+        seen_fs: Set[int] = set()
+
         for idx_idx, (mat_file_content, file_name) in enumerate(zip(all_files, names)):
             logger.debug(f"Processing file {idx_idx + 1}/{len(all_files)}: {file_name}")
 
@@ -168,6 +196,18 @@ class DatasetCreator:
                     name=file_name, 
                     comes_from_bbdds=comes_from_bbdds
                 )
+
+                # Track and validate sampling frequency across files
+                fs_in = int(cfg['fs'])
+                seen_fs.add(fs_in)
+                if downsampling_freq is None and include_raw and len(seen_fs) > 1:
+                    raise ValueError(f"Multiple sampling rates found {sorted(seen_fs)} with include_raw=True and no downsampling_freq set.")
+
+                # If requested, resample to target frequency before any further processing
+                if downsampling_freq is not None and fs_in != downsampling_freq:
+                    logger.info(f"Resampling from {fs_in} Hz to {downsampling_freq} Hz for {file_name}")
+                    signal_data = self._resample_segments(signal_data, fs_in=fs_in, fs_out=downsampling_freq)
+                    cfg['fs'] = downsampling_freq
 
                 n_segments, n_samples, n_channels = signal_data.shape
                 logger.info(f"Signal segments: {n_segments}, Samples/segment: {n_samples}, Channels: {n_channels}")
@@ -289,6 +329,9 @@ class DatasetCreator:
 
                 logger.info(f"Subject {subjects[-1]}")
 
+            except ValueError as e:
+                logger.exception(f"Error processing file {file_name}: {e}")
+                raise e
             except Exception as e:
                 logger.exception(f"Error processing file {file_name}: {e}")
                 continue
@@ -320,6 +363,8 @@ class DatasetCreator:
 
             if dividing_factor > 1:
                 f.attrs['dividing_factor'] = dividing_factor
+            if downsampling_freq is not None:
+                f.attrs['fs_downsampled'] = downsampling_freq
 
             subjects_group = f.create_group('subjects')
 
@@ -440,12 +485,17 @@ if __name__ == "__main__":
     creator = DatasetCreator()
 
     creator.create_dataset(
-        data_folders="/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH",
-        output_path="h5test_raw_only.h5",
+        data_folders=[
+            "/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/POCTEP",
+            "/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH"
+        ],
+        output_path="h5test_raw_only_downsampled.h5",
         include_raw=True,
         include_psd=False,
         include_features=False,
-        dividing_factor=1
+        dividing_factor=1,
+        downsampling_freq=200
+
     )
 
     # save_to_wandb(

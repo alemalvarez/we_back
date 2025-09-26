@@ -11,7 +11,7 @@ from loguru import logger
 from torch.utils.data import DataLoader
 
 from core.raw_dataset import RawDataset
-from models.simple_2d import Simple2D
+from models.simple_2d import Simple2D3Layers
 
 WANDB_PROJECT = "ADSEV_vs_HC"
 WANDB_CONFIG = {
@@ -81,12 +81,11 @@ validation_loader_no_shuffle = DataLoader(validation_dataset, batch_size=config.
 
 logger.success("Data ready")
 
-model = Simple2D(
+model = Simple2D3Layers(
     n_filters=config.n_filters,
     kernel_sizes=config.kernel_sizes,
     strides=config.strides,
     dropout_rate=config.dropout_rate,
-    input_shape=config.input_shape
 ).to(device)
 
 logger.success("Model ready")

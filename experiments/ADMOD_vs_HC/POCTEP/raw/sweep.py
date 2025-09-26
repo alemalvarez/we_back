@@ -6,7 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
 import torch.optim as optim
 from core.raw_dataset import RawDataset
-from models.simple_2d import Simple2D
+from models.simple_2d import Simple2D3Layers
 from loguru import logger
 from sklearn.metrics import ( # type: ignore
     accuracy_score,
@@ -61,7 +61,7 @@ def main():
         np.random.seed(RANDOM_SEED)
         device = _get_device()
 
-        wandb.run.name = f"Simple2D_{now.month:02d}{now.day:02d}_{now.hour:02d}{now.minute:02d}"
+        wandb.run.name = f"Simple2D3Layers_{now.month:02d}{now.day:02d}_{now.hour:02d}{now.minute:02d}"
 
         training_dataset = RawDataset(
             h5_file_path=H5_FILE_PATH,
@@ -85,7 +85,7 @@ def main():
 
         logger.success("Loader ready")
         
-        model = Simple2D(
+        model = Simple2D3Layers(
             n_filters=config.n_filters,
             kernel_sizes=config.kernel_sizes,
             strides=config.strides,

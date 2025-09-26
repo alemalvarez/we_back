@@ -1,8 +1,8 @@
 model_name: Simple2D_3layers
 n_filters:
+  - 4
   - 8
-  - 16
-  - 24
+  - 12
 kernel_sizes:
   - [50, 2]
   - [50, 17]
