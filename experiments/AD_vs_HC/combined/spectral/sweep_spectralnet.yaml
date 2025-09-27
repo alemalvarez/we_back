@@ -1,0 +1,44 @@
+name: spectral_net_sweep
+method: bayes
+metric:
+  name: val/final_f1
+  goal: maximize
+run_cap: 30
+
+parameters:
+  learning_rate:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 1.0e-2
+
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1.0e-6
+    max: 1.0e-3
+
+  dropout_rate:
+    distribution: uniform
+    min: 0.10
+    max: 0.7
+
+  batch_size:
+    values: [32, 64, 128, 256]
+
+  hidden_1_size:
+    values: [16, 32, 64, 128]
+
+  hidden_2_size:
+    values: [8, 16, 32, 64]
+
+  patience:
+    values: [5, 10, 15, 20]
+
+program: experiments.AD_vs_HC.combined.spectral.sweep
+
+command:
+  - ${env}
+  - uv
+  - run
+  - -m
+  - ${program}
+  - ${args}

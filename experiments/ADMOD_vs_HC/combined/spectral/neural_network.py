@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+from collections import defaultdict
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score # type: ignore
+from sklearn.metrics import precision_recall_curve # type: ignore
 from torch import nn
 import torch
 import numpy as np
@@ -13,6 +15,7 @@ from typing import Literal
 
 from core.spectral_dataset import SpectralDataset
 from models.spectral_net import SpectralNet
+
 
 # Configuration constants
 WANDB_PROJECT = "ADMOD_vs_HC"
@@ -90,6 +93,7 @@ training_dataset = SpectralDataset(
     subjects_txt_path="experiments/ADMOD_vs_HC/combined/spectral/splits/training_subjects.txt",
     normalize=config.scaler_type
 )
+
 
 validation_dataset = SpectralDataset(
     h5_file_path=h5_file_path, 
@@ -240,9 +244,8 @@ if ENABLE_WANDB:
     })
 
 model.eval()
-y_pred_list = []
-y_pred_proba_list = []
-y_true_list = []
+y_pred_proba_list: list[np.ndarray] = []
+y_true_list: list[np.ndarray] = []
 
 # validation_loader_no_shuffle already created above
 
@@ -250,40 +253,38 @@ with torch.no_grad():
     for batch_X, batch_y in validation_loader_no_shuffle:
         batch_X = batch_X.to(device)
         batch_y = batch_y.to(device)
-        outputs = model(batch_X).squeeze()
+        logits = model(batch_X).squeeze()
 
-        # Collect predictions and true labels in same order
-        y_pred_proba_list.extend(outputs.cpu().numpy())
-        predictions = (outputs > 0.5).float()
-        y_pred_list.extend(predictions.cpu().numpy())
+        probabilities = torch.sigmoid(logits)
+        y_pred_proba_list.extend(probabilities.cpu().numpy())
         y_true_list.extend(batch_y.cpu().numpy())
 
 # Convert to numpy arrays
-y_pred = np.array(y_pred_list)
 y_pred_proba = np.array(y_pred_proba_list)
 y_true = np.array(y_true_list)
 
 logger.info(f"Collected {len(y_true)} predictions from validation set")
-logger.info(f"Unique subjects in validation dataset: {len(set(validation_dataset.sample_to_subject))}")
 
-# Check for potential duplicates
-unique_pred_true_pairs = set(zip(y_pred, y_true))
-logger.info(f"Unique (prediction, true_label) pairs: {len(unique_pred_true_pairs)}")
+precisions, recalls, thresholds = precision_recall_curve(y_true, y_pred_proba)
+f1s = 2 * (precisions * recalls) / (precisions + recalls + 1e-8)
+best_idx = np.argmax(f1s)
+best_threshold = thresholds[best_idx]
+logger.info(f"Best threshold: {best_threshold:.4f}")
+y_pred = (y_pred_proba > best_threshold).astype(int)
 
-logger.debug(f"First 10 predictions: {y_pred[:10]}")
-logger.debug(f"First 10 true labels: {y_true[:10]}")
+assert hasattr(validation_dataset, "sample_to_subject"), "Validation dataset must have a sample_to_subject attribute"
+sample_to_subject = validation_dataset.sample_to_subject  # type: ignore
+assert len(sample_to_subject) == len(y_true), "sample_to_subject length must match number of validation samples"
+subject_correct: defaultdict[str, int] = defaultdict(int)
+subject_wrong: defaultdict[str, int] = defaultdict(int)
+for idx, subject in enumerate(sample_to_subject):
+    if y_pred[idx] == y_true[idx]:
+        subject_correct[subject] += 1
+    else:
+        subject_wrong[subject] += 1
+for subject in sorted(set(sample_to_subject)):
+    logger.info(f"Subject {subject}: correct={subject_correct[subject]}, wrong={subject_wrong[subject]}")
 
-# Create full probability matrix for compatibility with wandb plotting
-y_pred_proba_full = np.column_stack([1 - y_pred_proba, y_pred_proba])
-
-if ENABLE_WANDB:
-    wandb.log({
-        "val/final_accuracy": accuracy_score(y_true, y_pred),
-        "val/final_f1": f1_score(y_true, y_pred),
-        "val/final_precision": precision_score(y_true, y_pred),
-        "val/final_recall": recall_score(y_true, y_pred),
-        "val/final_roc_auc": roc_auc_score(y_true, y_pred_proba),
-    })
 
 logger.success("Final validation metrics:")
 logger.success(f"  Accuracy: {accuracy_score(y_true, y_pred):.4f}")
@@ -291,10 +292,3 @@ logger.success(f"  F1-Score: {f1_score(y_true, y_pred):.4f}")
 logger.success(f"  Precision: {precision_score(y_true, y_pred):.4f}")
 logger.success(f"  Recall: {recall_score(y_true, y_pred):.4f}")
 logger.success(f"  ROC-AUC: {roc_auc_score(y_true, y_pred_proba):.4f}")
-
-missclassified_indexes = np.where(y_pred != y_true)[0]
-logger.warning(f"Total misclassified samples: {len(missclassified_indexes)} out of {len(y_true)} total samples")
-
-# Only log first 10 misclassified samples to avoid spam
-for i, idx in enumerate(missclassified_indexes):
-    logger.warning(f"Missclassified sample {i+1}/{len(missclassified_indexes)} - Index {idx}: {validation_dataset.get_sample_to_subject(idx)}. Was classified as {y_pred[idx]} but should have been {y_true[idx]}")

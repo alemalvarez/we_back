@@ -9,7 +9,7 @@ import torch.optim as optim
 from core.schemas import BaseModelConfig
 from loguru import logger
 from collections import defaultdict
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score, precision_recall_curve # type: ignore
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score, precision_recall_curve, confusion_matrix # type: ignore
 
 def _get_device() -> torch.device:
     if torch.cuda.is_available():
@@ -78,8 +78,15 @@ def train_model(
 
     logger.success("Loader ready")
 
-    criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
+    weight = torch.tensor(train_pos / train_neg)
+    logger.info(f"Weight: {weight}")
+
+    criterion = nn.BCEWithLogitsLoss(pos_weight=weight)
+
+    if hasattr(config, "weight_decay") and config.weight_decay is not None:
+        optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+    else:
+        optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
 
     logger.success("Optimizer ready")
 
@@ -161,7 +168,27 @@ def _final_evaluation(
     best_idx = np.argmax(f1s)
     best_threshold = thresholds[best_idx]
     logger.info(f"Best threshold: {best_threshold:.4f}")
+    # logger.debug(f"Thresholds: {thresholds}")
+    # logger.debug(f"F1s: {f1s}")
+    # logger.debug(f"Precisions: {precisions}")
+    # logger.debug(f"Recalls: {recalls}")
+    # logger.debug(f"y_pred_proba.min(): {y_pred_proba.min()}")
+    # logger.debug(f"y_pred_proba.max(): {y_pred_proba.max()}")
+    # logger.debug(f"y_pred_proba.mean(): {y_pred_proba.mean()}")
+    # logger.debug(f"y_pred_proba.std(): {y_pred_proba.std()}")
+    # logger.debug(f"y_true.min(): {y_true.min()}")
+    # logger.debug(f"y_true.max(): {y_true.max()}")
+    # logger.debug(f"y_true.mean(): {y_true.mean()}")
+
+
     y_pred = (y_pred_proba > best_threshold).astype(int)
+    # logger.info(f"fraction_pred_pos = {y_pred.mean()}, fraction_true_pos = {y_true.mean()}")
+        # top10_idx = np.argsort(y_pred_proba)[-10:][::-1]
+        # for i in top10_idx:
+        #     logger.info(f"Top {i}: pred_proba={y_pred_proba[i]:.4f}, pred={y_pred[i]}, true={y_true[i]}")
+
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    logger.info(f"Confusion matrix: TN={tn}, FP={fp}, FN={fn}, TP={tp}")
 
     assert hasattr(validation_dataset, "sample_to_subject"), "Validation dataset must have a sample_to_subject attribute"
     sample_to_subject = validation_dataset.sample_to_subject  # type: ignore

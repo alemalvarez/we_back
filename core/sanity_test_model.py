@@ -156,6 +156,7 @@ def sanity_test_model(
         )
 
     if run_overfit_test:
+        model.train()
         optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
         logger.info("Running an overfitting test on a single batch...")
         data_overfit, target_overfit = data, target
