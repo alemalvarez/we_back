@@ -28,7 +28,7 @@ sys.path.append(str(project_root))
 def load_dataset_info(h5_path: str) -> Tuple[Dict[str, List[str]], Dict[str, int]]:
     """
     Load subject IDs and their categories from the H5 dataset.
-    Only includes ADSEV (positives) and HC (negatives) for binary classification.
+    Only includes AD (positives), ADMIL (positives) and HC (negatives) for binary classification.
 
     Args:
         h5_path: Path to the H5 file
@@ -39,8 +39,8 @@ def load_dataset_info(h5_path: str) -> Tuple[Dict[str, List[str]], Dict[str, int
     subjects_by_category: Dict[str, List[str]] = defaultdict(list)
     category_counts: Dict[str, int] = defaultdict(int)
 
-    # Only include ADSEV and HC categories
-    target_categories = {'ADMOD', 'HC'}
+    # Only include AD, ADMIL and HC categories
+    target_categories = {'ADMOD', 'HC', 'ADMIL'}
 
     with h5py.File(h5_path, 'r') as f:
         if 'subjects' not in f:
@@ -52,7 +52,7 @@ def load_dataset_info(h5_path: str) -> Tuple[Dict[str, List[str]], Dict[str, int
             subject_group = subjects_group[subject_id]
             if 'category' in subject_group.attrs:
                 category = subject_group.attrs['category']
-                # Only include ADMOD and HC subjects
+                # Only include AD, ADMIL and HC subjects
                 if category in target_categories:
                     subjects_by_category[category].append(subject_id)
                     category_counts[category] += 1
@@ -152,7 +152,7 @@ def main():
     print("Loading dataset information...")
     subjects_by_category, category_counts = load_dataset_info(h5_path)
 
-    print("\n=== Dataset Summary (ADMOD vs HC) ===")
+    print("\n=== Dataset Summary (AD, ADMIL vs HC) ===")
     total_subjects = sum(category_counts.values())
     print(f"Total subjects: {total_subjects}")
 
@@ -195,6 +195,8 @@ def main():
     save_split_to_file(test_subjects, "test_subjects.txt", output_dir)
 
     print("✓ All splits saved successfully!")
+
+
 
     def print_category_distribution(subjects: List[str], subjects_by_category: Dict[str, List[str]], split_name: str) -> None:
         # Build a mapping from subject to category
