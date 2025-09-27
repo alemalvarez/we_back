@@ -74,7 +74,7 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
     logger.success("Model ready")
 
     if hasattr(config, "pos_weight") and config.pos_weight is not None:
-        criterion = nn.BCEWithLogitsLoss(pos_weight=config.pos_weight)
+        criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor(config.pos_weight))
     else:
         criterion = nn.BCEWithLogitsLoss()
 
