@@ -9,8 +9,16 @@ import torch.optim as optim
 from core.schemas import BaseModelConfig
 from loguru import logger
 from collections import defaultdict
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score, precision_recall_curve, confusion_matrix # type: ignore
-
+from sklearn.metrics import ( # type: ignore
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    precision_recall_curve,
+    confusion_matrix,
+    matthews_corrcoef,
+)
 def _get_device() -> torch.device:
     if torch.cuda.is_available():
         logger.success("Using CUDA")
@@ -82,7 +90,7 @@ def train_model(
         weight = torch.tensor(config.pos_weight)
     else:
         weight = torch.tensor(train_pos / train_neg)
-        
+
     logger.info(f"Weight: {weight}")
 
     criterion = nn.BCEWithLogitsLoss(pos_weight=weight)
@@ -100,12 +108,12 @@ def train_model(
     logger.debug(f"Total parameters: {total_params}")
     logger.debug(f"Trainable parameters: {trainable_params}")
 
-    best_val_loss = float('inf')
+    best_early_stopping_metric = float('inf') if config.early_stopping_metric == 'loss' else -float('inf')
     patience_counter = 0
     best_model_state = None
 
     for epoch in range(config.max_epochs):
-        results = _one_epoch(
+        results: OneEpochResults = _one_epoch(
             model, 
             criterion, 
             optimizer, 
@@ -122,13 +130,19 @@ def train_model(
         logger.info(f"Epoch {epoch+1}/{config.max_epochs} completed in {results.train_time:.4f} seconds")
         logger.info(f"Train Loss: {results.train_loss:.4f}, Train Accuracy: {results.train_accuracy:.2f}")
         logger.info(f"Validation Loss: {results.val_loss:.4f}, Validation Accuracy: {results.val_accuracy:.2f}")
+        logger.info(f"Validation {config.early_stopping_metric}: {results.early_stopping_metric:.4f}")
         logger.info("="*100)
 
-        if results.val_loss < best_val_loss - config.min_delta:
-            best_val_loss = results.val_loss
+        if config.early_stopping_metric == 'loss':
+            is_better = results.early_stopping_metric < best_early_stopping_metric - config.min_delta
+        else:
+            is_better = results.early_stopping_metric > best_early_stopping_metric + config.min_delta
+
+        if is_better:
+            best_early_stopping_metric = results.early_stopping_metric
             best_model_state = model.state_dict().copy()
             patience_counter = 0
-            logger.success(f"New best validation loss: {results.val_loss:.4f}")
+            logger.success(f"New best validation {config.early_stopping_metric}: {results.early_stopping_metric:.4f}")
         else:
             patience_counter += 1
 
@@ -172,24 +186,8 @@ def _final_evaluation(
     best_idx = np.argmax(f1s)
     best_threshold = thresholds[best_idx]
     logger.info(f"Best threshold: {best_threshold:.4f}")
-    # logger.debug(f"Thresholds: {thresholds}")
-    # logger.debug(f"F1s: {f1s}")
-    # logger.debug(f"Precisions: {precisions}")
-    # logger.debug(f"Recalls: {recalls}")
-    # logger.debug(f"y_pred_proba.min(): {y_pred_proba.min()}")
-    # logger.debug(f"y_pred_proba.max(): {y_pred_proba.max()}")
-    # logger.debug(f"y_pred_proba.mean(): {y_pred_proba.mean()}")
-    # logger.debug(f"y_pred_proba.std(): {y_pred_proba.std()}")
-    # logger.debug(f"y_true.min(): {y_true.min()}")
-    # logger.debug(f"y_true.max(): {y_true.max()}")
-    # logger.debug(f"y_true.mean(): {y_true.mean()}")
-
 
     y_pred = (y_pred_proba > best_threshold).astype(int)
-    # logger.info(f"fraction_pred_pos = {y_pred.mean()}, fraction_true_pos = {y_true.mean()}")
-        # top10_idx = np.argsort(y_pred_proba)[-10:][::-1]
-        # for i in top10_idx:
-        #     logger.info(f"Top {i}: pred_proba={y_pred_proba[i]:.4f}, pred={y_pred[i]}, true={y_true[i]}")
 
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     logger.info(f"Confusion matrix: TN={tn}, FP={fp}, FN={fn}, TP={tp}")
@@ -212,11 +210,13 @@ def _final_evaluation(
     final_precision = precision_score(y_true, y_pred)
     final_recall = recall_score(y_true, y_pred)
     final_roc_auc = roc_auc_score(y_true, y_pred_proba)
+    final_mcc = matthews_corrcoef(y_true, y_pred)
     logger.info(f"Final accuracy: {final_accuracy:.4f}")
     logger.info(f"Final F1 score: {final_f1:.4f}")
     logger.info(f"Final precision: {final_precision:.4f}")
     logger.info(f"Final recall: {final_recall:.4f}")
     logger.info(f"Final ROC AUC: {final_roc_auc:.4f}")
+    logger.info(f"Final MCC: {final_mcc:.4f}")
 
 @dataclass
 class OneEpochResults:
@@ -225,6 +225,7 @@ class OneEpochResults:
     val_loss: float
     val_accuracy: float
     train_time: float
+    early_stopping_metric: float
 
 
 def _one_epoch(
@@ -264,18 +265,39 @@ def _one_epoch(
     val_loss = 0.0
     val_correct = 0
     val_total = 0
+
+    y_true_list: list[np.ndarray] = []
+    y_pred_list: list[np.ndarray] = []
     with torch.no_grad():
         for data, target in validation_loader:
             data, target = data.to(device), target.to(device).float()
-            outputs = model(data).squeeze(1)
-            loss = criterion(outputs, target)
+            logits = model(data).squeeze(1)
+            loss = criterion(logits, target)
             val_loss += loss.item()
+
+            outputs = torch.sigmoid(logits)
             predictions = (outputs > 0.5).float()
+
+            y_pred_list.extend(predictions.cpu().numpy())
+            y_true_list.extend(target.cpu().numpy())
+
             val_correct += (predictions == target).sum().item()
             val_total += target.size(0)
 
     avg_val_loss = val_loss / len(validation_loader) # divide by number of batches my bad (its already avgd)
     avg_val_accuracy = val_correct / val_total
+
+    y_true = np.array(y_true_list)
+    y_pred = np.array(y_pred_list)
+
+    if config.early_stopping_metric == 'loss':
+        early_stopping_metric = avg_val_loss
+    elif config.early_stopping_metric == 'f1':
+        avg_val_f1 = f1_score(y_true, y_pred)
+        early_stopping_metric = avg_val_f1
+    elif config.early_stopping_metric == 'mcc':
+        avg_val_mcc = matthews_corrcoef(y_true, y_pred)
+        early_stopping_metric = avg_val_mcc
 
     train_time = time.time() - epoch_start_time
 
@@ -285,4 +307,5 @@ def _one_epoch(
         val_loss=avg_val_loss,
         val_accuracy=avg_val_accuracy,
         train_time=train_time,
+        early_stopping_metric=early_stopping_metric,
     )

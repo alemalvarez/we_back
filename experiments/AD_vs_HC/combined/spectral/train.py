@@ -1,7 +1,4 @@
 import torch
-import numpy as np
-from loguru import logger
-from torch.utils.data import Subset
 from dataclasses import dataclass
 
 from core.spectral_dataset import SpectralDataset
@@ -30,6 +27,7 @@ WANDB_CONFIG = {
     "max_epochs": 50,
     "patience": 15,
     "min_delta": 0.001,
+    "early_stopping_metric": "mcc",
 }
 
 @dataclass

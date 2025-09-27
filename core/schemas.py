@@ -3,7 +3,7 @@ import numpy as np
 from typing import Optional
 from loguru import logger
 import dataclasses
-
+from typing import Literal
 
 @dataclass 
 class Subject:
@@ -118,6 +118,7 @@ class BaseModelConfig:
     max_epochs: int
     patience: int
     min_delta: float
+    early_stopping_metric: Optional[Literal['loss', 'f1', 'mcc']]
 
     def __post_init__(self):
         """Log the configuration parameters after initialization."""

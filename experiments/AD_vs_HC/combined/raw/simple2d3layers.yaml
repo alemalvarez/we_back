@@ -11,11 +11,11 @@ strides:
   - [1, 2]
   - [1, 17]
   - [1, 1]
-dropout_rate: 0.3334482388191818
-learning_rate: 0.0019420499140927296
+dropout_rate: 0.3735241742458837
+learning_rate: 0.003218982093137464
 batch_size: 32
 max_epochs: 50
 patience: 5
 min_delta: 0.001
-normalize: channel-subject
-pos_weight: 0.5
+normalize: subject
+pos_weight: 0.7
