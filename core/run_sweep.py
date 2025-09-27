@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 from loguru import logger
 from sklearn.metrics import ( # type: ignore
+    confusion_matrix,
     accuracy_score,
     f1_score,
     precision_score,
@@ -220,6 +221,15 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
     logger.info(f"Best threshold: {best_threshold:.4f}")
 
     y_pred = (y_pred_proba > best_threshold).astype(int)
+
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    logger.info(f"Confusion matrix: TN={tn}, FP={fp}, FN={fn}, TP={tp}")
+    wandb.log({
+        "val/tn": tn,
+        "val/fp": fp,
+        "val/fn": fn,
+        "val/tp": tp,
+    })
 
     final_accuracy = accuracy_score(y_true, y_pred)
     final_f1 = f1_score(y_true, y_pred)
