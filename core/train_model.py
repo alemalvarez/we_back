@@ -78,7 +78,7 @@ def train_model(
 
     logger.success("Loader ready")
 
-    weight = torch.tensor(train_pos / train_neg)
+    weight = torch.tensor(train_neg / train_pos)
     logger.info(f"Weight: {weight}")
 
     criterion = nn.BCEWithLogitsLoss(pos_weight=weight)

@@ -54,17 +54,17 @@ validation_dataset = SpectralDataset(
     normalize="standard"
 )
 
-pos_indices = np.where(training_dataset.labels == 1)[0]
-neg_indices = np.where(training_dataset.labels == 0)[0]
+# pos_indices = np.where(training_dataset.labels == 1)[0]
+# neg_indices = np.where(training_dataset.labels == 0)[0]
 
-logger.info(f"Positives: {len(pos_indices)}, Negatives: {len(neg_indices)}")
+# logger.info(f"Positives: {len(pos_indices)}, Negatives: {len(neg_indices)}")
 
-n_neg = len(neg_indices)
-pos_subset = np.random.choice(pos_indices, size=n_neg, replace=False)
+# n_neg = len(neg_indices)
+# pos_subset = np.random.choice(pos_indices, size=n_neg, replace=False)
 
-balanced_indices = np.concatenate([pos_subset, neg_indices])
+# balanced_indices = np.concatenate([pos_subset, neg_indices])
 
-balanced_training_dataset = Subset(training_dataset, balanced_indices)
+# balanced_training_dataset = Subset(training_dataset, balanced_indices)
 
 model = SpectralNet(
     input_size=config.input_size,
@@ -73,7 +73,7 @@ model = SpectralNet(
     dropout_rate=config.dropout_rate
 )
 
-trained_model = train_model(model, config, balanced_training_dataset, validation_dataset)
+trained_model = train_model(model, config, training_dataset, validation_dataset)
 
 # Save the trained model next to this script
 script_dir = os.path.dirname(os.path.abspath(__file__))
