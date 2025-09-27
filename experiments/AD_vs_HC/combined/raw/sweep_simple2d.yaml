@@ -28,7 +28,7 @@ parameters:
       - "50_8__20_8__20_2" # second best
       - "500_2__5_17__10_2" # experimental
 
-      - "200_4__20_4__20_4" # experimental
+      - "200_4__20_4__20_2" # experimental
 
   strides:
     values:
