@@ -73,7 +73,10 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
 
     logger.success("Model ready")
 
-    criterion = nn.BCEWithLogitsLoss()
+    if hasattr(config, "pos_weight") and config.pos_weight is not None:
+        criterion = nn.BCEWithLogitsLoss(pos_weight=config.pos_weight)
+    else:
+        criterion = nn.BCEWithLogitsLoss()
 
     if hasattr(config, "weight_decay") and config.weight_decay is not None:
         optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)

@@ -29,17 +29,10 @@ parameters:
       # Baseline (your best)
       - [[50, 2], [50, 17], [50, 2]]
       # Option A (make L3 trivial)
-      - [[50, 2], [50, 17], [50, 1]]
-      # Option B (slightly smaller L2)
-      - [[50, 2], [50, 15], [50, 1]]
-      # Option C (don’t collapse width early; allow L3 width=3)
-      - [[50, 2], [50, 3], [50, 3]]
-      # Option D (keep more width; moderate L2)
-      - [[50, 2], [50, 11], [50, 3]]
-      # Option E (gentle early downsample; allow small L3)
-      - [[50, 1], [50, 3], [50, 3]]
-      # Option F (collapse late using 17 but keep L3 width=3 valid)
-      - [[50, 2], [50, 17], [50, 3]]
+      - [[150, 2], [20, 17], [20, 2]]
+      - [[50, 4], [20, 4], [20, 4]]
+      - [[50, 8], [20, 8], [20, 2]]
+      - [[30, 2], [50, 17], [20, 2]]
 
   strides:
     values:
@@ -50,13 +43,6 @@ parameters:
       # Option B
       - [[1, 2], [1, 15], [1, 1]]
       # Option C
-      - [[1, 2], [1, 2], [1, 1]]
-      # Option D
-      - [[1, 2], [1, 1], [1, 1]]
-      # Option E
-      - [[1, 2], [1, 2], [1, 1]]
-      # Option F
-      - [[1, 1], [1, 17], [1, 1]]
 
   max_epochs:
     value: 50
@@ -76,7 +62,10 @@ parameters:
       - channel
       - full
 
-program: experiments.ADMOD_vs_HC.POCTEP.raw.sweep
+  pos_weight:
+    values: [0.3, 0.5, 0.7, 1.0]
+
+program: experiments.AD_vs_HC.combined.raw.sweep
 
 command:
   - ${env}
