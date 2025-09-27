@@ -15,34 +15,25 @@ parameters:
     max: 0.5
 
   batch_size:
-    values: [32, 64, 128]
+    value: 32
 
   # Architecture options
   n_filters:
-    values:
-      - [8, 16, 32]
-      - [16, 32, 64]
-      - [32, 64, 128]
+    value: [16, 32, 64]
 
   kernel_sizes:
     values:
-      # Baseline (your best)
-      - [[50, 2], [50, 17], [50, 2]]
-      # Option A (make L3 trivial)
-      - [[150, 2], [20, 17], [20, 2]]
-      - [[50, 4], [20, 4], [20, 4]]
-      - [[50, 8], [20, 8], [20, 2]]
-      - [[30, 2], [50, 17], [20, 2]]
+      - [[50, 2], [50, 17], [50, 2]] # third best rn
+      - [[150, 2], [20, 17], [20, 2]] # this one is the best
+      - [[50, 8], [20, 8], [20, 2]] # second best
+      - [[500, 2], [5, 17], [10, 2]] # experimental
+
+      - [[200, 4], [20, 4], [20, 4]] # experimental
 
   strides:
     values:
-      # Baseline (your best)
-      - [[1, 2], [1, 17], [1, 2]]
       # Option A
       - [[1, 2], [1, 17], [1, 1]]
-      # Option B
-      - [[1, 2], [1, 15], [1, 1]]
-      # Option C
 
   max_epochs:
     value: 50
@@ -55,15 +46,15 @@ parameters:
 
   normalize:
     values:
-      - sample-channel
+      # - sample-channel
       - sample
       - channel-subject
       - subject
-      - channel
-      - full
+      # - channel
+      # - full
 
   pos_weight:
-    values: [0.3, 0.5, 0.7, 1.0]
+    value: 0.7
 
 program: experiments.AD_vs_HC.combined.raw.sweep
 

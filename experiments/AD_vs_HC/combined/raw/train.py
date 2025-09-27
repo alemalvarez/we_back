@@ -26,6 +26,7 @@ class Simple2D3LayersConfig(BaseModelConfig):
     strides: List[Tuple[int, int]]
     dropout_rate: float
     normalize: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full']
+    pos_weight: float
 
 config = Simple2D3LayersConfig(**WANDB_CONFIG) # type: ignore
 model = Simple2D3Layers(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate)
