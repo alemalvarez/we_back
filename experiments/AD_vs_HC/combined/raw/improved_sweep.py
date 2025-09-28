@@ -1,5 +1,5 @@
 from core.raw_dataset import RawDataset
-from models.simple_2d import Simple2D3Layers
+from models.simple_2d import Simple2D3Layers, Improved2D
 from loguru import logger
 import wandb
 from dotenv import load_dotenv
@@ -58,11 +58,15 @@ def main():
         parsed_strides = _parse_two_level(config.strides)
         strides: List[Tuple[int, int]] = [(int(p[0]), int(p[1])) for p in parsed_strides]
 
-        model = Simple2D3Layers(
+        parsed_paddings = _parse_two_level(config.padding_sizes)
+        paddings: List[Tuple[int, int]] = [(int(p[0]), int(p[1])) for p in parsed_paddings]
+
+        model = Improved2D(
             n_filters=n_filters,
             kernel_sizes=kernel_sizes,
             strides=strides,
-            dropout_rate=config.dropout_rate
+            dropout_rate=config.dropout_rate,
+            paddings=paddings
         )
 
         run_sweep(model, run, training_dataset, validation_dataset)

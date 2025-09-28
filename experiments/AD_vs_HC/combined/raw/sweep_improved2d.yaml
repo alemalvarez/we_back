@@ -68,7 +68,7 @@ parameters:
       # - f1
       # - mcc
 
-program: experiments.AD_vs_HC.combined.raw.sweep
+program: experiments.AD_vs_HC.combined.raw.improved_sweep
 
 command:
   - ${env}
