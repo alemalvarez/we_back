@@ -82,4 +82,4 @@ if __name__ == "__main__":
     strides = [tuple(x) for x in [[4, 1], [2, 1], [1, 1]]]
     paddings = [tuple(x) for x in [[0, 1], [0, 0], [0, 0]]]
     input_shape = (1000, 68)
-    print(validate_kernel(kernels, strides, paddings, input_shape))
+    print(validate_kernel(kernels, strides, paddings, input_shape)) # type: ignore
