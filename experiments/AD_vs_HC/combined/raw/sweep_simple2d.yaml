@@ -11,8 +11,8 @@ parameters:
     max: 5.0e-4
 
   dropout_rate:
-    min: 0.05
-    max: 0.5
+    min: 0.2
+    max: 0.7
 
   batch_size:
     value: 32
@@ -26,14 +26,9 @@ parameters:
       - "50_2__50_17__50_2" # third best rn
       - "150_2__20_17__20_2" # this one is the best
       - "50_8__20_8__20_2" # second best
-      - "500_2__5_17__10_2" # experimental
-
-      - "200_4__20_4__20_2" # experimental
 
   strides:
-    values:
-      # Option A
-      - "1_2__1_17__1_1"
+    value: "1_2__1_17__1_1"
 
   max_epochs:
     value: 50
@@ -47,7 +42,7 @@ parameters:
   normalize:
     values:
       # - sample-channel
-      - sample
+      # - sample
       - channel-subject
       - subject
       # - channel
@@ -55,6 +50,12 @@ parameters:
 
   pos_weight:
     value: 0.7
+
+  early_stopping_metric:
+    values:
+      - loss
+      - f1
+      - mcc
 
 program: experiments.AD_vs_HC.combined.raw.sweep
 

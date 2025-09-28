@@ -1,4 +1,4 @@
-model_name: Simple2D_3layers
+model_name: Improved2D
 n_filters:
   - 16
   - 32
@@ -11,12 +11,16 @@ strides:
   - [1, 2]
   - [1, 17]
   - [1, 1]
+paddings:
+  - [0, 0]
+  - [0, 0]
+
 dropout_rate: 0.3735241742458837
 learning_rate: 0.003218982093137464
 batch_size: 32
 max_epochs: 50
 patience: 5
 min_delta: 0.001
-normalize: subject
+normalize: subject-channel
 pos_weight: 0.7
 early_stopping_metric: loss

@@ -14,6 +14,7 @@ from sklearn.metrics import ( # type: ignore
     recall_score,
     roc_auc_score,
     precision_recall_curve,
+    matthews_corrcoef,
 )
 import wandb
 from dotenv import load_dotenv
@@ -97,7 +98,12 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
     logger.debug(f"Total parameters: {total_params}")
     logger.debug(f"Trainable parameters: {trainable_params}")
 
-    best_val_loss = float('inf')
+    if not hasattr(config, "early_stopping_metric") or config.early_stopping_metric is None:
+        config.early_stopping_metric = 'loss'
+
+    logger.info(f"Early stopping metric: {config.early_stopping_metric}")
+    best_val_metric = float('inf') if config.early_stopping_metric == 'loss' else -float('inf')
+
     patience_counter = 0
     best_model_state = None
 
@@ -135,18 +141,30 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
         val_loss = 0.0
         val_correct = 0
         val_total = 0
+
+        y_true_list: list[np.ndarray] = []
+        y_pred_list: list[np.ndarray] = []
         with torch.no_grad():
             for data, target in validation_loader:
                 data, target = data.to(device), target.to(device).float()
-                outputs = model(data).squeeze(1)
-                loss = criterion(outputs, target)
+                logits = model(data).squeeze(1)
+                loss = criterion(logits, target)
                 val_loss += loss.item()
+
+                outputs = torch.sigmoid(logits)
                 predictions = (outputs > 0.5).float()
+
+                y_pred_list.extend(predictions.cpu().numpy())
+                y_true_list.extend(target.cpu().numpy())
+
                 val_correct += (predictions == target).sum().item()
                 val_total += target.size(0)
 
         avg_val_loss = val_loss / len(validation_loader)
         avg_val_accuracy = val_correct / val_total
+
+        y_true = np.array(y_true_list)
+        y_pred = np.array(y_pred_list)
 
         train_time = time.time() - epoch_start_time
         if train_time > 60:
@@ -166,9 +184,21 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
             "train/epoch_time": train_time,
         })
 
-        if avg_val_loss < best_val_loss - 1e-4:
-            logger.success(f"New best validation loss: {avg_val_loss:.4f}")
-            best_val_loss = avg_val_loss
+        if config.early_stopping_metric == 'loss':
+            early_stopping_metric = avg_val_loss
+        elif config.early_stopping_metric == 'f1':
+            early_stopping_metric = f1_score(y_true, y_pred)
+        elif config.early_stopping_metric == 'mcc':
+            early_stopping_metric = matthews_corrcoef(y_true, y_pred)
+
+        if config.early_stopping_metric == 'loss':
+            is_better = avg_val_loss < best_val_metric - config.min_delta
+        else:
+            is_better = avg_val_loss > best_val_metric + config.min_delta
+
+        if is_better:
+            best_val_metric = early_stopping_metric
+            logger.success(f"New best validation {config.early_stopping_metric}: {early_stopping_metric:.4f}")
             best_model_state = model.state_dict().copy()
             patience_counter = 0
         else:
@@ -194,8 +224,9 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
     with torch.no_grad():
         for data, target in validation_loader:
             data, target = data.to(device), target.to(device).float()
-            outputs = model(data).squeeze(1)
-            loss = criterion(outputs, target)
+            logits = model(data).squeeze(1)
+            outputs = torch.sigmoid(logits)
+            loss = criterion(logits, target)
             val_loss += loss.item()
 
             y_pred_proba_list.extend(outputs.cpu().numpy())
@@ -236,6 +267,7 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
     final_precision = precision_score(y_true, y_pred)
     final_recall = recall_score(y_true, y_pred)
     final_roc_auc = roc_auc_score(y_true, y_pred_proba)
+    final_mcc = matthews_corrcoef(y_true, y_pred)
 
     wandb.log({
         "val/final_accuracy": final_accuracy,
@@ -243,6 +275,7 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
         "val/final_precision": final_precision,
         "val/final_recall": final_recall,
         "val/final_roc_auc": final_roc_auc,
+        "val/final_mcc": final_mcc,
     })
 
     logger.info(f"Final accuracy: {final_accuracy:.4f}")
@@ -250,5 +283,6 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
     logger.info(f"Final precision: {final_precision:.4f}")
     logger.info(f"Final recall: {final_recall:.4f}")
     logger.info(f"Final ROC AUC: {final_roc_auc:.4f}")
+    logger.info(f"Final MCC: {final_mcc:.4f}")
         
         
