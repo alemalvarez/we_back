@@ -1,0 +1,78 @@
+name: deeper_raw_sweep
+method: bayes
+metric:
+  name: val/final_f1
+  goal: maximize
+run_cap: 50
+
+parameters:
+  learning_rate:
+    min: 1.0e-5
+    max: 5.0e-4
+
+  dropout_rate:
+    min: 0.3
+    max: 0.7
+
+  batch_size:
+    value: 32
+
+  # Architecture options
+  n_filters:
+    values:
+      - "16_32_64_128"
+      - "8_16_32_64"
+      - "24_48_96_192"
+
+  kernel_sizes:
+    values:
+      - "150_2__20_17__20_2__3_3"
+      - "100_3__15_10__10_3__5_2"
+
+  strides:
+    values:
+      - "2_2__2_2__1_1__1_1"
+      - "3_2__2_1__2_1__1_1"
+
+  padding_sizes:
+    values:
+      - "25_1__5_2__5_1__1_1"
+      - "10_1__3_1__2_1__2_1"
+
+  max_epochs:
+    value: 50
+
+  patience:
+    value: 5
+
+  min_delta:
+    value: 0.001
+
+  normalize:
+    values:
+      # - sample-channel
+      # - sample
+      - channel-subject
+      # - subject
+      # - channel
+      # - full
+
+  pos_weight:
+    value: 0.7
+
+  early_stopping_metric:
+    values:
+      - loss
+      # - f1
+      # - mcc
+
+program: experiments.AD_vs_HC.combined.raw.deeper_sweep
+
+command:
+  - ${env}
+  - uv
+  - run
+  - -m
+  - ${program}
+  - ${args}
+
