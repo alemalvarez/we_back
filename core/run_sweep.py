@@ -99,7 +99,7 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
     logger.debug(f"Trainable parameters: {trainable_params}")
 
     if not hasattr(config, "early_stopping_metric") or config.early_stopping_metric is None:
-        config.early_stopping_metric = 'loss'
+        config.early_stopping_metric = 'loss'  # type: ignore
 
     logger.info(f"Early stopping metric: {config.early_stopping_metric}")
     best_val_metric = float('inf') if config.early_stopping_metric == 'loss' else -float('inf')
@@ -192,9 +192,9 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
             early_stopping_metric = matthews_corrcoef(y_true, y_pred)
 
         if config.early_stopping_metric == 'loss':
-            is_better = avg_val_loss < best_val_metric - config.min_delta
+            is_better = early_stopping_metric < best_val_metric - config.min_delta
         else:
-            is_better = avg_val_loss > best_val_metric + config.min_delta
+            is_better = early_stopping_metric > best_val_metric + config.min_delta
 
         if is_better:
             best_val_metric = early_stopping_metric

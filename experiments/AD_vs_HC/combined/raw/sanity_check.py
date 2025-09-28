@@ -13,7 +13,7 @@ load_dotenv()
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "h5test_raw_only.h5")
 logger.info(f"H5 file path: {H5_FILE_PATH}")
-WANDB_PROJECT = "ADMOD_vs_HC"
+WANDB_PROJECT = "AD_vs_HC"
 
 WANDB_CONFIG = yaml.load(open("experiments/AD_vs_HC/combined/raw/simple2d3layers.yaml"), Loader=yaml.FullLoader)
 WANDB_CONFIG["random_seed"] = int(os.getenv("RANDOM_SEED", "42"))
