@@ -23,23 +23,37 @@ parameters:
 
   kernel_sizes:
     values:
-      - "150_2__20_17__20_2"   # Final: (813, 1)
-      - "100_1__30_1__10_1"    # Final: (863, 2) 
-      - "75_1__25_1__8_1"      # Final: (1193, 2)
-      - "50_2__15_8__8_2"      # Final: (1436, 1)
-      - "120_1__20_2__10_1"    # Final: (1241, 1)
+      # Temporal-focused architectures (faster)
+      - "100_2__25_4__10_2"     # ~Final: (450, 16) - balanced temporal
+      - "75_3__20_6__8_3"       # ~Final: (450, 11) - broader spatial
+      - "120_1__30_2__12_2"     # ~Final: (440, 17) - pure temporal first
+      
+      # Your proven architecture
+      - "150_2__20_17__20_2"    # Your current working one
+      
+      # Spatial-temporal hybrids (moderate complexity)
+      - "80_4__25_8__10_4"      # ~Final: (400, 8) - square-ish kernels
+      - "60_6__15_10__8_4"      # ~Final: (450, 6) - progressive spatial
+      
+      # Conservative options (fastest)
+      - "50_2__15_4__8_2"       # ~Final: (470, 16) - small kernels
+      - "40_3__12_6__6_3"       # ~Final: (480, 11) - very conservative
 
   strides:
     values:
-      - "1_2__1_17__1_1"       # your current
-      - "2_1__3_1__2_1"        # temporal downsampling  
-      - "2_2__2_2__1_1"        # uniform reduction
-      - "1_1__1_1__1_1"        # no striding
+      - "2_2__2_2__1_1"        # uniform early reduction
+      - "2_1__2_1__2_1"        # temporal focus
+      - "1_2__2_1__1_1"        # spatial then temporal
+      - "3_1__2_1__1_1"        # aggressive temporal start
+      - "2_1__2_2__2_1"        # late reduction
 
   padding_sizes:
     values:
-      - "0_0__0_0__0_0"        # no padding
-      - "25_1__5_2__5_1"       # conservative padding
+      - "0_0__0_0__0_0"        # no padding - natural reduction
+      - "1_1__1_1__1_1"        # minimal uniform padding
+      - "2_1__1_1__1_1"        # light temporal padding
+      - "5_1__2_1__1_1"        # moderate padding
+      - "10_1__3_2__2_1"       # heavier padding for larger kernels
 
   max_epochs:
     value: 50
