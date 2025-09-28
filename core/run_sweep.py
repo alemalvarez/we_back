@@ -125,7 +125,7 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
             optimizer.step()
 
             batch_duration = time.time() - batch_start_time
-            if batch_duration > 30:
+            if batch_duration > 10:
                 logger.warning(f"Batch {batch_idx+1} took {batch_duration:.2f} seconds (>30s). Aborting run.")
                 return
 
@@ -167,7 +167,7 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
         y_pred = np.array(y_pred_list)
 
         train_time = time.time() - epoch_start_time
-        if train_time > 60:
+        if train_time > 30:
             logger.warning(f"Epoch {epoch+1} took {train_time:.2f} seconds, which is longer than a minute. Stopping training.")
             break
 
@@ -208,6 +208,10 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
 
         if patience_counter >= config.patience:
             logger.info(f"Early stopping triggered at epoch {epoch+1}")
+            best_epoch = epoch+1 - patience_counter
+            wandb.log({
+                "val/best_epoch": best_epoch,
+            })
             break
 
     if best_model_state is not None:

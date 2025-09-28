@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import os
 from core.run_sweep import run_sweep
 from typing import List, Tuple
+from core.validate_kernel import validate_kernel
 
 load_dotenv()
 
@@ -60,6 +61,12 @@ def main():
 
         parsed_paddings = _parse_two_level(config.padding_sizes)
         paddings: List[Tuple[int, int]] = [(int(p[0]), int(p[1])) for p in parsed_paddings]
+
+        if not validate_kernel(kernel_sizes, strides, paddings, (1000, 68)):
+            logger.error("Kernel configuration is invalid")
+            exit(1)
+        else:
+            logger.success("Kernel configuration is valid")
 
         model = Improved2D(
             n_filters=n_filters,
