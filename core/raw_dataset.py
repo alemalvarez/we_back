@@ -129,6 +129,11 @@ class RawDataset(Dataset):
                 data = subject_data[subj_key]['data']
                 normalized_segments = (data.astype(np.float32) - mean_val) / std_val
                 normalized_data.append(normalized_segments)
+
+        else:
+            logger.warning(f"No normalization, or normalization invalid: {normalize}")
+            logger.warning("Using no normalization")
+            normalized_data = [subject_data[subj_key]['data'] for subj_key in self.subject_ids]
         
         # Build final features and labels lists
         for subj_idx, subj_key in enumerate(self.subject_ids):

@@ -1,0 +1,80 @@
+name: improved2d_raw_sweep
+method: bayes
+metric:
+  name: val/final_f1
+  goal: maximize
+run_cap: 50
+
+parameters:
+  learning_rate:
+    min: 1.0e-5
+    max: 5.0e-4
+
+  dropout_rate:
+    min: 0.2
+    max: 0.7
+
+  batch_size:
+    value: 32
+
+  # Architecture options
+  n_filters:
+    value: "16_32_64"
+
+  kernel_sizes:
+    values:
+      - "150_2__20_17__20_2"   # Final: (813, 1)
+      - "100_1__30_1__10_1"    # Final: (863, 2) 
+      - "75_1__25_1__8_1"      # Final: (1193, 2)
+      - "50_2__15_8__8_2"      # Final: (1436, 1)
+      - "120_1__20_2__10_1"    # Final: (1241, 1)
+
+  strides:
+    values:
+      - "1_2__1_17__1_1"       # your current
+      - "2_1__3_1__2_1"        # temporal downsampling  
+      - "2_2__2_2__1_1"        # uniform reduction
+      - "1_1__1_1__1_1"        # no striding
+
+  padding_sizes:
+    values:
+      - "0_0__0_0__0_0"        # no padding
+      - "25_1__5_2__5_1"       # conservative padding
+
+  max_epochs:
+    value: 50
+
+  patience:
+    value: 5
+
+  min_delta:
+    value: 0.001
+
+  normalize:
+    values:
+      # - sample-channel
+      # - sample
+      - channel-subject
+      # - subject
+      # - channel
+      # - full
+
+  pos_weight:
+    value: 0.7
+
+  early_stopping_metric:
+    values:
+      - loss
+      # - f1
+      # - mcc
+
+program: experiments.AD_vs_HC.combined.raw.sweep
+
+command:
+  - ${env}
+  - uv
+  - run
+  - -m
+  - ${program}
+  - ${args}
+
