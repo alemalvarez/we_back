@@ -1,6 +1,6 @@
 from collections import defaultdict
 from collections.abc import Sized
-from typing import Dict, Tuple
+from typing import Dict
 
 import numpy as np
 import torch

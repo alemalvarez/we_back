@@ -3,6 +3,77 @@ from torch import nn
 from typing import List, Tuple
 
 
+class DeeperCustom(nn.Module):
+    """Simple 2D CNN for EEG data classification.
+    This is thought for taking in data with a shape like
+    (n_samples, n_channels, 1).
+    """
+
+    def __init__(
+        self,
+        n_filters: List[int],
+        kernel_sizes: List[Tuple[int, int]],
+        strides: List[Tuple[int, int]],
+        dropout_rate: float,
+        paddings: List[Tuple[int, int]],
+        activation: str,
+        dropout_before_activation: bool
+    ):
+        super(DeeperCustom, self).__init__()
+
+        self.dropout_before_activation: bool = dropout_before_activation
+        self.activation: nn.Module = nn.ReLU(inplace=True)
+
+        # Select activation
+        if activation == "relu":
+            act = nn.ReLU(inplace=True) # type: ignore
+        elif activation == "leaky_relu":
+            act = nn.LeakyReLU(inplace=True) # type: ignore 
+        elif activation == "tanh":
+            act = nn.Tanh() # type: ignore
+        elif activation == "sigmoid":
+            act = nn.Sigmoid() # type: ignore
+        elif activation == "gelu":
+            act = nn.GELU() # type: ignore
+        elif activation == "silu":
+            act = nn.SiLU()
+        else:
+            raise ValueError(f"Unknown activation: {activation}")
+
+        self.activation = act  # type: ignore
+
+        # Build layers in a DRY way
+        layers = []
+        in_channels = 1
+        for i in range(4):
+            conv = nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=n_filters[i],
+                kernel_size=kernel_sizes[i],
+                stride=strides[i],
+                padding=paddings[i],
+            )
+            bn = nn.BatchNorm2d(n_filters[i])
+            if self.dropout_before_activation:
+                seq = nn.Sequential(conv, bn, nn.Dropout(dropout_rate), act)
+            else:
+                seq = nn.Sequential(conv, bn, act, nn.Dropout(dropout_rate))
+            layers.append(seq)
+            in_channels = n_filters[i]
+
+        self.layers = nn.ModuleList(layers)
+        self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.classifier = nn.Linear(n_filters[3], 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.dim() == 3:
+            x = x.unsqueeze(1)
+        for layer in self.layers:
+            x = layer(x)
+        x = self.global_avg_pool(x)
+        x = x.flatten(1)
+        return self.classifier(x)
+
 class Deeper2D(nn.Module):
     """Simple 2D CNN for EEG data classification.
     This is thought for taking in data with a shape like

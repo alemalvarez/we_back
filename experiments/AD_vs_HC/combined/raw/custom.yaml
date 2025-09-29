@@ -1,0 +1,35 @@
+model_name: DeeperCustom
+n_filters:
+  - 16
+  - 32
+  - 64
+  - 128
+
+kernel_sizes:
+  - [100, 3]
+  - [15, 10]
+  - [10, 3]
+  - [5, 2]
+strides:
+  - [2, 2]
+  - [2, 2]
+  - [1, 1]
+  - [1, 1]
+paddings:
+  - [25, 1]
+  - [5, 2]
+  - [5, 1]
+  - [1, 1]
+
+activation: gelu
+dropout_before_activation: true
+
+dropout_rate: 0.5801191546085006
+learning_rate: 0.0004710918966323602
+batch_size: 32
+max_epochs: 50
+patience: 5
+min_delta: 0.001
+normalize: channel-subject
+pos_weight: 0.7
+early_stopping_metric: loss
