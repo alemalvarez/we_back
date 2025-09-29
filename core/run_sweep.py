@@ -19,6 +19,8 @@ from sklearn.metrics import ( # type: ignore
 import wandb
 from dotenv import load_dotenv
 from collections.abc import Sized
+from collections import defaultdict
+import os
 load_dotenv()
 
 def _get_device() -> torch.device:
@@ -49,6 +51,8 @@ def _count_pos_neg(dataset: Dataset) -> tuple[int, int]:
 def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, validation_dataset: Dataset):
 
     config = run.config
+
+    assert run is not None, "wandb run must not be None"
 
     now = datetime.now()
 
@@ -266,6 +270,19 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
         "val/tp": tp,
     })
 
+    assert hasattr(validation_dataset, "sample_to_subject"), "Validation dataset must have a sample_to_subject attribute"
+    sample_to_subject = validation_dataset.sample_to_subject  # type: ignore
+    assert len(sample_to_subject) == len(y_true), "sample_to_subject length must match number of validation samples"
+    subject_correct: defaultdict[str, int] = defaultdict(int)
+    subject_wrong: defaultdict[str, int] = defaultdict(int)
+    for idx, subject in enumerate(sample_to_subject):
+        if y_pred[idx] == y_true[idx]:
+            subject_correct[subject] += 1
+        else:
+            subject_wrong[subject] += 1
+    for subject in sorted(set(sample_to_subject)):
+        logger.info(f"Subject {subject}: correct={subject_correct[subject]}, wrong={subject_wrong[subject]}")
+
     final_accuracy = accuracy_score(y_true, y_pred)
     final_f1 = f1_score(y_true, y_pred)
     final_precision = precision_score(y_true, y_pred)
@@ -288,5 +305,21 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
     logger.info(f"Final recall: {final_recall:.4f}")
     logger.info(f"Final ROC AUC: {final_roc_auc:.4f}")
     logger.info(f"Final MCC: {final_mcc:.4f}")
+    
+    # Save and log model artifact if final F1 exceeds threshold
+    try:
+        f1_threshold = 0.85
+        if float(final_f1) > f1_threshold:
+            ckpt_dir = "checkpoints"
+            os.makedirs(ckpt_dir, exist_ok=True)
+            ckpt_path = os.path.join(ckpt_dir, f"{run.id}_best.pt")
+            torch.save(model.state_dict(), ckpt_path)
+
+            artifact = wandb.Artifact(name=f"model-{run.id}", type="model")
+            artifact.add_file(ckpt_path)
+            wandb.log_artifact(artifact)
+            logger.success(f"Saved and logged model artifact at F1>{f1_threshold}: {ckpt_path}")
+    except Exception as e:
+        logger.error(f"Failed to save/log model artifact: {e}")
         
         
