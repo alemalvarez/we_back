@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from core.raw_dataset import RawDataset
 from core.schemas import BaseModelConfig
-from models.simple_2d import Improved2D, Deeper2D
+from models.simple_2d import Deeper2D
 from core.train_model import train_model
 from dotenv import load_dotenv
 import os

@@ -3,7 +3,7 @@ from typing import Tuple, Literal
 from typing import List
 from core.schemas import BaseModelConfig
 from core.raw_dataset import RawDataset
-from models.simple_2d import Improved2D, Deeper2D
+from models.simple_2d import Deeper2D
 from core.sanity_test_model import sanity_test_model
 from core.validate_kernel import validate_kernel
 import yaml # type: ignore[import]

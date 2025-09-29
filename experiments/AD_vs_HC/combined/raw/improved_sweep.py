@@ -1,5 +1,5 @@
 from core.raw_dataset import RawDataset
-from models.simple_2d import Simple2D3Layers, Improved2D
+from models.simple_2d import Improved2D
 from loguru import logger
 import wandb
 from dotenv import load_dotenv
