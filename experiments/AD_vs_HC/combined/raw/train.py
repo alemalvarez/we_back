@@ -10,6 +10,7 @@ import os
 import yaml # type: ignore[import]
 from loguru import logger
 import torch
+import numpy as np
 
 load_dotenv()
 
@@ -20,6 +21,9 @@ WANDB_PROJECT = "AD_vs_HC"
 # WANDB_CONFIG = yaml.load(open("experiments/AD_vs_HC/combined/raw/improved2d.yaml"), Loader=yaml.FullLoader)
 WANDB_CONFIG = yaml.load(open("experiments/AD_vs_HC/combined/raw/deeper.yaml"), Loader=yaml.FullLoader)
 WANDB_CONFIG["random_seed"] = int(os.getenv("RANDOM_SEED", "42"))
+
+torch.manual_seed(int(os.getenv("RANDOM_SEED", "42")))
+np.random.seed(int(os.getenv("RANDOM_SEED", "42")))
 
 @dataclass
 class Simple2D3LayersConfig(BaseModelConfig):

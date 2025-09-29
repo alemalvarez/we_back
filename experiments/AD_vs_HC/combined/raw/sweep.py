@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import os
 from core.run_sweep import run_sweep
 from typing import List, Tuple
+import torch
+import numpy as np
 
 load_dotenv()
 
@@ -35,6 +37,9 @@ def test_parser():
 def main():
     with wandb.init(project=WANDB_PROJECT) as run:
         config = run.config
+
+        torch.manual_seed(RANDOM_SEED)
+        np.random.seed(RANDOM_SEED)
 
         training_dataset = RawDataset(
             h5_file_path=H5_FILE_PATH,
