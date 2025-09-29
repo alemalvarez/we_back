@@ -109,8 +109,8 @@ class Improved2D(nn.Module):
                 padding = paddings[0],
             ),
             nn.BatchNorm2d(n_filters[0]),
-            nn.Dropout(dropout_rate),
             nn.ReLU(inplace=True),
+            nn.Dropout(dropout_rate),
         )
 
         self.l2 = nn.Sequential(
@@ -122,8 +122,8 @@ class Improved2D(nn.Module):
                 padding = paddings[1],
             ),
             nn.BatchNorm2d(n_filters[1]),
-            nn.Dropout(dropout_rate),
             nn.ReLU(inplace=True),
+            nn.Dropout(dropout_rate),
         )
 
         self.l3 = nn.Sequential(
@@ -135,8 +135,8 @@ class Improved2D(nn.Module):
                 padding = paddings[2],
             ),
             nn.BatchNorm2d(n_filters[2]),
-            nn.Dropout(dropout_rate),
             nn.ReLU(inplace=True),
+            nn.Dropout(dropout_rate),
         )
 
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
