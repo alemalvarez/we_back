@@ -21,15 +21,8 @@ parameters:
     values:
       - relu
       - leaky_relu
-      - tanh
-      - sigmoid
       - gelu
       - silu
-
-  dropout_before_activation:
-    values:
-      - true
-      - false
 
   # Architecture options
   n_filters:
@@ -59,7 +52,23 @@ parameters:
     value: channel-subject
 
   pos_weight:
-    value: 0.7
+    min: 0.3
+    max: 0.8
+
+  augment:
+    value: true
+
+  augment_prob_pos:
+    min: 0.3
+    max: 0.8
+
+  augment_prob_neg:
+    min: 0.3
+    max: 0.8
+
+  noise_std:
+    min: 0.01
+    max: 0.8
 
   early_stopping_metric:
     value: loss

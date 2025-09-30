@@ -40,13 +40,20 @@ def main():
         training_dataset = RawDataset(
             h5_file_path=H5_FILE_PATH,
             subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/training_subjects.txt",
-            normalize=config.normalize
+            normalize=config.normalize,
+            augment=config.augment,
+            augment_prob=(
+                config.augment_prob_neg, # neg, pos
+                config.augment_prob_pos
+            ),
+            noise_std=config.noise_std
         )
 
         validation_dataset = RawDataset(
             h5_file_path=H5_FILE_PATH,
             subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/validation_subjects.txt",
-            normalize=config.normalize
+            normalize=config.normalize,
+            augment=False
         )
         
         # Allow string-encoded params in sweeps (two-level parser)
@@ -75,7 +82,6 @@ def main():
             dropout_rate=config.dropout_rate,
             paddings=paddings,
             activation=config.activation,
-            dropout_before_activation=config.dropout_before_activation
         )
 
         run_sweep(model, run, training_dataset, validation_dataset)

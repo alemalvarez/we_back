@@ -3,7 +3,7 @@ from typing import Tuple, Literal
 from typing import List
 from core.schemas import BaseModelConfig
 from core.raw_dataset import RawDataset
-from models.simple_2d import Deeper2D, DeeperCustom
+from models.simple_2d import DeeperCustom
 from core.sanity_test_model import sanity_test_model
 from core.validate_kernel import validate_kernel
 import yaml # type: ignore[import]
@@ -63,6 +63,10 @@ class DeeperCustomConfig(BaseModelConfig):
     paddings: List[Tuple[int, int]]
     activation: str
     dropout_before_activation: bool
+    augment: bool
+    augment_prob_pos: float
+    augment_prob_neg: float
+    noise_std: float
 
 # config = Simple2DConfig(**WANDB_CONFIG) # type: ignore
 # config = Improved2DConfig(**WANDB_CONFIG) # type: ignore
@@ -84,7 +88,13 @@ model = DeeperCustom(n_filters=config.n_filters, kernel_sizes=config.kernel_size
 dataset = RawDataset(
     h5_file_path=H5_FILE_PATH,
     subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/training_subjects.txt",
-    normalize=config.normalize
+    normalize=config.normalize,
+    augment=config.augment,
+    augment_prob=(
+        config.augment_prob_neg, # neg, pos
+        config.augment_prob_pos
+    ),
+    noise_std=config.noise_std
 )
 
 sanity_test_model(

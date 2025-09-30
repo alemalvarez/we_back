@@ -1,4 +1,4 @@
-from typing import List, Literal
+from typing import List, Literal, Tuple
 import h5py  # type: ignore
 from loguru import logger
 from torch.utils.data import Dataset
@@ -12,12 +12,18 @@ class RawDataset(Dataset):
     samples: torch.Tensor
     labels: torch.Tensor
     sample_to_subject: List[str]
+    augment: bool
+    augment_prob: Tuple[float, float]
+    noise_std: float
 
     def __init__(
         self, 
         h5_file_path: str, 
         subjects_txt_path: str,
         normalize: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full'] = 'sample-channel',
+        augment: bool = False,
+        augment_prob: Tuple[float, float] = (0.5, 0.0), # neg, pos
+        noise_std: float = 0.1,
     ):
         with open(subjects_txt_path, 'r') as f:
             self.subject_ids = [line.strip() for line in f.readlines()]
@@ -26,6 +32,9 @@ class RawDataset(Dataset):
         features_list = []
         labels_list = []
         self.sample_to_subject: List[str] = []
+        self.augment = augment
+        self.augment_prob = augment_prob
+        self.noise_std = noise_std
         subject_data = {}  # Store subject data for normalization
         all_segments = None  # Will be created only when needed
 
@@ -158,7 +167,16 @@ class RawDataset(Dataset):
         return len(self.samples)
     
     def __getitem__(self, idx):
-        return self.samples[idx], self.labels[idx]
+        x = self.samples[idx].clone()
+        y = self.labels[idx]
+        if (
+            self.augment and 
+            torch.rand(1).item() < self.augment_prob[y.item()]
+        ):
+            noise = torch.randn_like(x) * self.noise_std
+            x = x + noise
+            
+        return x, y
 
     def get_sample_to_subject(self, idx: int) -> str:
         return self.sample_to_subject[idx]

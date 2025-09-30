@@ -17,30 +17,22 @@ class DeeperCustom(nn.Module):
         dropout_rate: float,
         paddings: List[Tuple[int, int]],
         activation: str,
-        dropout_before_activation: bool
     ):
         super(DeeperCustom, self).__init__()
 
-        self.dropout_before_activation: bool = dropout_before_activation
-        self.activation: nn.Module = nn.ReLU(inplace=True)
-
         # Select activation
         if activation == "relu":
-            act = nn.ReLU(inplace=True) # type: ignore
+            act: nn.Module = nn.ReLU(inplace=True)
         elif activation == "leaky_relu":
-            act = nn.LeakyReLU(inplace=True) # type: ignore 
-        elif activation == "tanh":
-            act = nn.Tanh() # type: ignore
-        elif activation == "sigmoid":
-            act = nn.Sigmoid() # type: ignore
+            act = nn.LeakyReLU(inplace=True)
         elif activation == "gelu":
-            act = nn.GELU() # type: ignore
+            act = nn.GELU()
         elif activation == "silu":
             act = nn.SiLU()
         else:
-            raise ValueError(f"Unknown activation: {activation}")
+            raise ValueError(f"Unsupported activation: {activation}")
 
-        self.activation = act  # type: ignore
+        self.activation = act
 
         # Build layers in a DRY way
         layers = []
@@ -54,10 +46,7 @@ class DeeperCustom(nn.Module):
                 padding=paddings[i],
             )
             bn = nn.BatchNorm2d(n_filters[i])
-            if self.dropout_before_activation:
-                seq = nn.Sequential(conv, bn, nn.Dropout(dropout_rate), act)
-            else:
-                seq = nn.Sequential(conv, bn, act, nn.Dropout(dropout_rate))
+            seq = nn.Sequential(conv, bn, nn.Dropout(dropout_rate), act)
             layers.append(seq)
             in_channels = n_filters[i]
 

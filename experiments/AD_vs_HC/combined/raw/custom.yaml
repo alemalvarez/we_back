@@ -22,7 +22,10 @@ paddings:
   - [1, 1]
 
 activation: gelu
-dropout_before_activation: true
+augment: true
+augment_prob_pos: 1.0
+augment_prob_neg: 1.0
+noise_std: 10.0
 
 dropout_rate: 0.5801191546085006
 learning_rate: 0.0004710918966323602

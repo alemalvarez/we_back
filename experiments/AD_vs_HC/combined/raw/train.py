@@ -66,7 +66,10 @@ class CustomConfig(BaseModelConfig):
     pos_weight: float
     paddings: List[Tuple[int, int]]
     activation: str
-    dropout_before_activation: bool
+    augment: bool
+    augment_prob_pos: float
+    augment_prob_neg: float
+    noise_std: float
 
 
 # config = Simple2D3LayersConfig(**WANDB_CONFIG) # type: ignore
@@ -76,18 +79,25 @@ class CustomConfig(BaseModelConfig):
 config = CustomConfig(**WANDB_CONFIG) # type: ignore
 # model = Deeper2D(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, paddings=config.paddings)
 
-model = DeeperCustom(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, paddings=config.paddings, activation=config.activation, dropout_before_activation=config.dropout_before_activation)
+model = DeeperCustom(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, paddings=config.paddings, activation=config.activation)
 
 training_dataset = RawDataset(
     h5_file_path=H5_FILE_PATH,
     subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/training_subjects.txt",
-    normalize=config.normalize
+    normalize=config.normalize,
+    augment=config.augment,
+    augment_prob=(
+        config.augment_prob_neg, # neg, pos
+        config.augment_prob_pos
+    ),
+    noise_std=config.noise_std
 )
 
 validation_dataset = RawDataset(
     h5_file_path=H5_FILE_PATH,
     subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/validation_subjects.txt",
-    normalize=config.normalize
+    normalize=config.normalize,
+    augment=False
 )
 
 trained_model = train_model(model, config, training_dataset, validation_dataset)
