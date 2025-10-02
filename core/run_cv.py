@@ -148,11 +148,23 @@ def run_cv(
         if not values:
             continue
         aggregate[key] = {
+            "min": float(np.min(values)),
+            "max": float(np.max(values)),
             "mean": float(np.mean(values)),
             "std": float(np.std(values)),
         }
 
     for key, stats in aggregate.items():
-        logger.info(f"CV {key}: mean={stats['mean']:.4f}, std={stats['std']:.4f}")
+        logger.info(f"CV {key}: min={stats['min']:.4f}, max={stats['max']:.4f}, mean={stats['mean']:.4f}, std={stats['std']:.4f}")
 
-    return {"folds": metrics_per_fold, "aggregate": aggregate}
+    return {
+        "folds": metrics_per_fold,
+        "aggregate": aggregate,
+        "fold_details": [
+            {
+                "train_subjects": [s for i, fold in enumerate(folds) if i != fold_idx for s in fold],
+                "val_subjects": folds[fold_idx]
+            }
+            for fold_idx in range(n_folds)
+        ]
+    }
