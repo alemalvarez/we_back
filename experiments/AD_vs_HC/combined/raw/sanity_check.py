@@ -62,7 +62,6 @@ class DeeperCustomConfig(BaseModelConfig):
     pos_weight: float
     paddings: List[Tuple[int, int]]
     activation: str
-    dropout_before_activation: bool
     augment: bool
     augment_prob_pos: float
     augment_prob_neg: float
@@ -82,7 +81,7 @@ logger.success("Kernel configuration is valid")
 # model = Simple2D3Layers(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate)
 # model = Improved2D(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, paddings=config.paddings)
 # model = Deeper2D(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, paddings=config.paddings)
-model = DeeperCustom(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, paddings=config.paddings, activation=config.activation, dropout_before_activation=config.dropout_before_activation)
+model = DeeperCustom(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, paddings=config.paddings, activation=config.activation)
 
 
 dataset = RawDataset(

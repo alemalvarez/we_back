@@ -308,7 +308,7 @@ def run_sweep(model: nn.Module, run: wandb.Run, training_dataset: Dataset, valid
     
     # Save and log model artifact if final F1 exceeds threshold
     try:
-        f1_threshold = 0.85
+        f1_threshold = 0.87
         if float(final_f1) > f1_threshold:
             ckpt_dir = "checkpoints"
             os.makedirs(ckpt_dir, exist_ok=True)

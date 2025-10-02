@@ -1,4 +1,4 @@
-from typing import List, Literal, Tuple
+from typing import List, Literal, Tuple, Optional
 import h5py  # type: ignore
 from loguru import logger
 from torch.utils.data import Dataset
@@ -19,14 +19,21 @@ class RawDataset(Dataset):
     def __init__(
         self, 
         h5_file_path: str, 
-        subjects_txt_path: str,
+        subjects_txt_path: Optional[str] = None,
         normalize: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full'] = 'sample-channel',
         augment: bool = False,
         augment_prob: Tuple[float, float] = (0.5, 0.0), # neg, pos
         noise_std: float = 0.1,
+        subjects_list: Optional[List[str]] = None,
     ):
-        with open(subjects_txt_path, 'r') as f:
-            self.subject_ids = [line.strip() for line in f.readlines()]
+        if subjects_list is not None:
+            logger.info(f"Using subjects_list with {len(subjects_list)} subjects")
+            self.subject_ids = subjects_list
+        else:
+            assert subjects_txt_path is not None, "subjects_txt_path must be provided if subjects_list is not provided"
+            logger.info(f"Loading raw segments dataset from {h5_file_path} with {len(self.subject_ids)} subjects")
+            with open(subjects_txt_path, 'r') as f:
+                self.subject_ids = [line.strip() for line in f.readlines()]
 
         # Collect subject data and prepare for normalization
         features_list = []
@@ -37,8 +44,6 @@ class RawDataset(Dataset):
         self.noise_std = noise_std
         subject_data = {}  # Store subject data for normalization
         all_segments = None  # Will be created only when needed
-
-        logger.info(f"Loading raw segments dataset from {h5_file_path} with {len(self.subject_ids)} subjects")
 
         with h5py.File(h5_file_path, 'r') as f:
             for subj_key in self.subject_ids:
