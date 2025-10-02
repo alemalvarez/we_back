@@ -1,0 +1,38 @@
+model_name: DeeperCustom
+n_filters:
+  - 16
+  - 32
+  - 64
+  - 128
+
+kernel_sizes:
+  - [100, 3]
+  - [15, 10]
+  - [10, 3]
+  - [5, 2]
+strides:
+  - [2, 2]
+  - [2, 2]
+  - [1, 1]
+  - [1, 1]
+paddings:
+  - [25, 1]
+  - [5, 2]
+  - [5, 1]
+  - [1, 1]
+
+activation: leaky_relu
+augment: true
+augment_prob_pos: 0.566790610843366
+augment_prob_neg: 0.5749388311859311
+noise_std: 0.46600594808964335
+
+dropout_rate: 0.3964725537695077
+learning_rate: 0.00048098326879301545
+batch_size: 32
+max_epochs: 50
+patience: 5
+min_delta: 0.001
+normalize: channel-subject
+pos_weight: 0.3729557186227171
+early_stopping_metric: loss

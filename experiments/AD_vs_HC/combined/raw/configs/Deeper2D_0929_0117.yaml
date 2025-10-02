@@ -1,0 +1,32 @@
+model_name: Deeper2D
+n_filters:
+  - 16
+  - 32
+  - 64
+  - 128
+
+kernel_sizes:
+  - [150, 2]
+  - [20, 17]
+  - [20, 2]
+  - [3, 3]
+strides:
+  - [3, 2]
+  - [2, 1]
+  - [2, 1]
+  - [1, 1]
+paddings:
+  - [25, 1]
+  - [5, 2]
+  - [5, 1]
+  - [1, 1]
+
+dropout_rate: 0.6403725503498028
+learning_rate: 0.00018360473301635364
+batch_size: 32
+max_epochs: 50
+patience: 5
+min_delta: 0.001
+normalize: channel-subject
+pos_weight: 0.7
+early_stopping_metric: loss
