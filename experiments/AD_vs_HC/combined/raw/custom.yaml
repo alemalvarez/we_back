@@ -21,18 +21,18 @@ paddings:
   - [5, 1]
   - [1, 1]
 
-activation: gelu
+activation: silu
 augment: true
-augment_prob_pos: 1.0
-augment_prob_neg: 1.0
-noise_std: 10.0
+augment_prob_pos: 0.7418978150685602
+augment_prob_neg: 0.6099114794114658
+noise_std: 0.31713262346394766
 
-dropout_rate: 0.5801191546085006
-learning_rate: 0.0004710918966323602
+dropout_rate: 0.650602794871795
+learning_rate: 0.000461329720580626
 batch_size: 32
 max_epochs: 50
 patience: 5
 min_delta: 0.001
 normalize: channel-subject
-pos_weight: 0.7
+pos_weight: 0.429354006726779
 early_stopping_metric: loss
