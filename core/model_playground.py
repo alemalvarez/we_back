@@ -109,7 +109,11 @@ def load_subjects() -> List[str]:
 
 def load_config(config_filename: str) -> BaseModelConfig:
     """Load config from experiments/AD_vs_HC/combined/raw/ directory."""
-    config_path = f"experiments/AD_vs_HC/combined/raw/{config_filename}"
+    # Handle both absolute paths and relative filenames
+    if os.path.isabs(config_filename):
+        config_path = config_filename
+    else:
+        config_path = f"experiments/AD_vs_HC/combined/raw/{config_filename}"
     with open(config_path) as f:
         config_dict = yaml.safe_load(f)
     config_dict["random_seed"] = int(os.getenv("RANDOM_SEED", "42"))
