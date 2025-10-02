@@ -26,3 +26,6 @@ plots/
 *.txt
 *.png
 .DS_Store
+
+# Ignore everything inside checkpoints folder
+checkpoints/

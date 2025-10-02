@@ -10,6 +10,16 @@ from copy import deepcopy
 from core.raw_dataset import RawDataset
 from core.train_model import train_model
 from core.eval_model import evaluate_model
+from sklearn.model_selection import StratifiedKFold  # type: ignore
+
+def _subject_type(subject_id: str) -> str:
+    if subject_id.startswith("ADMIL"):
+        return "ADMIL"
+    elif subject_id.startswith("ADMOD"):
+        return "ADMOD"
+    elif subject_id.startswith("HC"):
+        return "HC"
+    return "UNKNOWN"
 
 def _get_device() -> torch.device:
     if torch.cuda.is_available():
@@ -48,11 +58,13 @@ def run_cv(
     assert n_folds >= 2, "n_folds must be at least 2"
     assert len(included_subjects) >= n_folds, "n_folds cannot exceed number of included_subjects"
 
-    rng = np.random.RandomState(config.random_seed)  # type: ignore[arg-type]
-    subjects = included_subjects.copy()
-    rng.shuffle(subjects)
+    # Use StratifiedKFold for proper stratified splitting by category
+    labels = [_subject_type(sid) for sid in included_subjects]
+    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=config.random_seed)
 
-    folds: list[list[str]] = [list(arr) for arr in np.array_split(np.array(subjects, dtype=object), n_folds)]
+    folds: list[list[str]] = []
+    for _, test_idx in skf.split(included_subjects, labels):
+        folds.append([included_subjects[i] for i in test_idx])
 
     original_state = deepcopy(model.state_dict())
 
@@ -62,7 +74,7 @@ def run_cv(
     augment_prob_pos = float(getattr(config, "augment_prob_pos", 0.0))
     noise_std = float(getattr(config, "noise_std", 0.1))
 
-    logger.info(f"Running {n_folds}-fold CV over {len(subjects)} subjects")
+    logger.info(f"Running {n_folds}-fold CV over {len(included_subjects)} subjects")
 
     metrics_per_fold: list[dict[str, float]] = []
 
@@ -74,6 +86,27 @@ def run_cv(
 
         logger.debug(f"train_subjects: {train_subjects}")
         logger.debug(f"val_subjects: {val_subjects}")
+
+        # Log category distribution for train and val
+        def _dist(subjs: list[str]) -> dict[str, tuple[int, float]]:
+            total = len(subjs)
+            counts = {"ADMIL": 0, "ADMOD": 0, "HC": 0}
+            for s in subjs:
+                t = _subject_type(s)
+                if t in counts:
+                    counts[t] += 1
+            return {k: (v, (v / total * 100.0) if total > 0 else 0.0) for k, v in counts.items()}
+
+        train_dist = _dist(train_subjects)
+        val_dist = _dist(val_subjects)
+        logger.info(
+            "Train distribution | "
+            + ", ".join([f"{k}={train_dist[k][0]} ({train_dist[k][1]:.1f}%)" for k in ["ADMIL", "ADMOD", "HC"]])
+        )
+        logger.info(
+            "Val distribution   | "
+            + ", ".join([f"{k}={val_dist[k][0]} ({val_dist[k][1]:.1f}%)" for k in ["ADMIL", "ADMOD", "HC"]])
+        )
 
         training_dataset = RawDataset(
             h5_file_path=h5_file_path,
