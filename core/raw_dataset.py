@@ -31,9 +31,9 @@ class RawDataset(Dataset):
             self.subject_ids = subjects_list
         else:
             assert subjects_txt_path is not None, "subjects_txt_path must be provided if subjects_list is not provided"
-            logger.info(f"Loading raw segments dataset from {h5_file_path} with {len(self.subject_ids)} subjects")
             with open(subjects_txt_path, 'r') as f:
                 self.subject_ids = [line.strip() for line in f.readlines()]
+            logger.info(f"Loading raw segments dataset from {h5_file_path} with {len(self.subject_ids)} subjects")
 
         # Collect subject data and prepare for normalization
         features_list = []
