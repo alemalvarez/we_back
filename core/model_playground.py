@@ -127,7 +127,7 @@ def load_config(config_filename: str) -> BaseModelConfig:
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
-def run_model_playground(config_filenames: List[str], n_folds: int = 5, output_dir: str = "playground_results"):
+def run_model_playground(config_filenames: List[str], n_folds: int = 5, output_dir: str = "playground_results", h5_file_path: str = "h5test_raw_only.h5"):
     """
     Run cross-validation playground for multiple configs.
 
@@ -136,8 +136,6 @@ def run_model_playground(config_filenames: List[str], n_folds: int = 5, output_d
         n_folds: Number of CV folds
         output_dir: Directory to save results
     """
-    H5_FILE_PATH = os.getenv("H5_FILE_PATH", "h5test_raw_only.h5")
-    logger.info(f"H5 file path: {H5_FILE_PATH}")
 
     subjects = load_subjects()
     results = {}
@@ -153,7 +151,7 @@ def run_model_playground(config_filenames: List[str], n_folds: int = 5, output_d
         cv_results = run_cv(
             model=model,
             config=config,
-            h5_file_path=H5_FILE_PATH,
+            h5_file_path=h5_file_path,
             included_subjects=subjects,
             n_folds=n_folds
         )
