@@ -12,7 +12,7 @@ logger.info(f"H5 file path: {H5_FILE_PATH}")
 
 
 configs_to_test = sorted(
-    os.path.join("configs", f) for f in os.listdir("configs") if f.endswith(".yaml")
+    os.path.join("configs", f) for f in os.listdir(os.path.join(os.path.dirname(__file__), "configs")) if f.endswith(".yaml")
 )
 
 if __name__ == "__main__":

@@ -103,7 +103,12 @@ def train_model(
     # Create scheduler if cosine annealing is enabled
     scheduler = None
     if getattr(config, "use_cosine_annealing", False):
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.max_epochs)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer,
+            T_0=5,
+            T_mult=1,
+            eta_min=1e-6
+        )
         logger.success("Optimizer and cosine annealing scheduler ready")
     else:
         logger.success("Optimizer ready")
