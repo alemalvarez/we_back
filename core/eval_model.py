@@ -1,6 +1,6 @@
 from collections import defaultdict
 from collections.abc import Sized
-from typing import Dict
+from typing import Dict, Any
 
 import numpy as np
 import torch
@@ -34,7 +34,7 @@ def evaluate_model(
     model: torch.nn.Module,
     evaluation_dataset: Dataset,
     batch_size: int = 32,
-) -> Dict[str, float]:
+) -> Dict[str, Any]:
     """
     Run evaluation on a dataset and print the same metrics computed in training/sweeps.
 
@@ -77,19 +77,41 @@ def evaluate_model(
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     logger.info(f"Confusion matrix: TN={tn}, FP={fp}, FN={fn}, TP={tp}")
 
+    # Calculate loss for each sample
+    criterion = torch.nn.BCEWithLogitsLoss(reduction='none')
+    y_true_tensor = torch.tensor(y_true, dtype=torch.float32)
+    y_pred_logits_tensor = torch.tensor(np.log(y_pred_proba / (1 - y_pred_proba + 1e-8)), dtype=torch.float32)
+    losses = criterion(y_pred_logits_tensor, y_true_tensor).numpy()
+
     # Optional per-subject breakdown if dataset provides mapping
+    per_subject_metrics = {}
     if hasattr(evaluation_dataset, "sample_to_subject"):
         sample_to_subject = getattr(evaluation_dataset, "sample_to_subject")
         assert len(sample_to_subject) == len(y_true), "sample_to_subject length must match number of samples"
         subject_correct: defaultdict[str, int] = defaultdict(int)
         subject_wrong: defaultdict[str, int] = defaultdict(int)
+        subject_total_loss: defaultdict[str, float] = defaultdict(float)
+        subject_segment_count: defaultdict[str, int] = defaultdict(int)
+
         for idx, subject in enumerate(sample_to_subject):
+            subject_segment_count[subject] += 1
+            subject_total_loss[subject] += losses[idx]
             if y_pred[idx] == y_true[idx]:
                 subject_correct[subject] += 1
             else:
                 subject_wrong[subject] += 1
+
         for subject in sorted(set(sample_to_subject)):
-            logger.info(f"Subject {subject}: correct={subject_correct[subject]}, wrong={subject_wrong[subject]}")
+            segment_count = subject_segment_count[subject]
+            total_loss = subject_total_loss[subject]
+            mean_loss = total_loss / segment_count if segment_count > 0 else 0.0
+            per_subject_metrics[subject] = {
+                "correct_segments": subject_correct[subject],
+                "wrong_segments": subject_wrong[subject],
+                "accumulated_loss": float(total_loss),
+                "mean_loss": float(mean_loss)
+            }
+            logger.info(f"Subject {subject}: correct={subject_correct[subject]}, wrong={subject_wrong[subject]}, total_loss={total_loss:.4f}, mean_loss={mean_loss:.4f}")
 
     final_accuracy = float(accuracy_score(y_true, y_pred))
     final_f1 = float(f1_score(y_true, y_pred))
@@ -110,6 +132,7 @@ def evaluate_model(
         "val/fn": float(fn),
         "val/tp": float(tp),
         "val/best_threshold": float(best_threshold),
+        "per_subject_metrics": per_subject_metrics,
     }
 
     # Print succinctly

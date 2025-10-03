@@ -36,3 +36,4 @@ min_delta: 0.001
 normalize: channel-subject
 pos_weight: 0.6795796353138406
 early_stopping_metric: loss
+use_cosine_annealing: true

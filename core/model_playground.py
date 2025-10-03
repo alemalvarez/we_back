@@ -259,6 +259,18 @@ def run_model_playground(config_filenames: List[str], n_folds: int = 5, output_d
             n_folds=n_folds
         )
 
+        # Collect per-subject metrics across all folds for this config
+        per_subject_results = {}
+        for i, (fold_metrics, fold_detail) in enumerate(
+            zip(cv_results["folds"], cv_results["fold_details"])
+        ):
+            val_subjects = fold_detail["val_subjects"]
+            per_subject_metrics = fold_metrics.get("per_subject_metrics", {})
+
+            for subject in val_subjects:
+                if subject in per_subject_metrics:
+                    per_subject_results[subject] = per_subject_metrics[subject]
+
         # Store results
         results[config_filename] = {
             "model_name": config.model_name,
@@ -273,6 +285,7 @@ def run_model_playground(config_filenames: List[str], n_folds: int = 5, output_d
                     zip(cv_results["folds"], cv_results["fold_details"])
                 )
             ],
+            "per_subject_results": per_subject_results,
             "aggregate": cv_results["aggregate"]
         }
 
