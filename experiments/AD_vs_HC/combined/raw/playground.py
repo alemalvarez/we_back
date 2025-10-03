@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 from loguru import logger
-from pathlib import Path
 from core.model_playground import run_model_playground
 
 
