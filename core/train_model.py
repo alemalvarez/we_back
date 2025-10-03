@@ -164,6 +164,8 @@ def train_model(
         # Step the scheduler at the end of each epoch if enabled
         if scheduler is not None:
             scheduler.step()
+            current_lr = optimizer.param_groups[0]['lr']
+            logger.info(f"Learning rate after annealing: {current_lr:.6f}")
         
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
@@ -197,8 +199,15 @@ def _final_evaluation(
     logger.info(f"Collected {len(y_true)} predictions from validation set")
 
     precisions, recalls, thresholds = precision_recall_curve(y_true, y_pred_proba)
-    f1s = 2 * (precisions * recalls) / (precisions + recalls + 1e-8)
-    best_idx = np.argmax(f1s)
+
+    # Calculate MCC for each threshold
+    mccs = []
+    for threshold in thresholds:
+        y_pred_at_threshold = (y_pred_proba > threshold).astype(int)
+        mcc = matthews_corrcoef(y_true, y_pred_at_threshold)
+        mccs.append(mcc)
+
+    best_idx = np.argmax(mccs)
     best_threshold = thresholds[best_idx]
     logger.info(f"Best threshold: {best_threshold:.4f}")
 
