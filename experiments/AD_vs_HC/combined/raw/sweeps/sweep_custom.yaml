@@ -73,7 +73,7 @@ parameters:
   early_stopping_metric:
     value: loss
 
-program: experiments.AD_vs_HC.combined.raw.custom_sweep
+program: experiments.AD_vs_HC.combined.raw.sweep
 
 command:
   - ${env}
@@ -81,5 +81,6 @@ command:
   - run
   - -m
   - ${program}
+  - DeeperCustom
   - ${args}
 

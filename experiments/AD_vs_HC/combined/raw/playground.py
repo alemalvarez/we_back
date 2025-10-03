@@ -1,14 +1,15 @@
 import os
 from dotenv import load_dotenv
 from loguru import logger
-
+import glob
 from core.model_playground import run_model_playground
+
 
 load_dotenv()
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "h5test_raw_only.h5")
 logger.info(f"H5 file path: {H5_FILE_PATH}")
-import glob
+
 
 configs_to_test = sorted(
     glob.glob("configs/*.yaml")

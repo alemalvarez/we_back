@@ -1,13 +1,13 @@
 from core.raw_dataset import RawDataset
-from models.simple_2d import Simple2D3Layers
+from core.model_playground import create_model_from_wandb_config
 from loguru import logger
 import wandb
 from dotenv import load_dotenv
 import os
 from core.run_sweep import run_sweep
-from typing import List, Tuple
 import torch
 import numpy as np
+import sys
 
 load_dotenv()
 
@@ -22,56 +22,43 @@ def _parse_two_level(s: str) -> list:
         return [[int(p) for p in g.split("_") if p] for g in s.split("__") if g]
     return [int(p) for p in s.split("_") if p]
 
-def test_parser():
-    print(_parse_two_level("16_32_64"))
-    print(_parse_two_level("50_2__50_17__50_2"))
-    print(_parse_two_level("1_2__1_17__1_1"))
-    print(_parse_two_level("200_4__20_4__20_4"))
-    print(_parse_two_level("200_8__20_8__20_2"))
-    print(_parse_two_level("200_16__20_16__20_2"))
-    print(_parse_two_level("200_32__20_32__20_2"))
-    print(_parse_two_level("200_64__20_64__20_2"))
-    print(_parse_two_level("200_128__20_128__20_2"))
-    print(_parse_two_level("200_256__20_256__20_2"))
-
 def main():
+    # Get model type from command line argument if provided
+    model_type = None
+    if len(sys.argv) > 1:
+        model_type = sys.argv[1]
+        logger.info(f"Using model type: {model_type}")
+
     with wandb.init(project=WANDB_PROJECT) as run:
         config = run.config
 
         torch.manual_seed(RANDOM_SEED)
         np.random.seed(RANDOM_SEED)
 
+        # Create training dataset with optional augment parameters
         training_dataset = RawDataset(
             h5_file_path=H5_FILE_PATH,
             subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/training_subjects.txt",
-            normalize=config.normalize
+            normalize=getattr(config, "normalize", "sample-channel"),  # type: ignore[attr-defined]
+            augment=bool(getattr(config, "augment", False)),  # type: ignore[attr-defined]
+            augment_prob=(
+                float(getattr(config, "augment_prob_neg", 0.5)),  # type: ignore[attr-defined] # neg, pos
+                float(getattr(config, "augment_prob_pos", 0.0))  # type: ignore[attr-defined]
+            ),
+            noise_std=float(getattr(config, "noise_std", 0.1))  # type: ignore[attr-defined]
         )
 
         validation_dataset = RawDataset(
             h5_file_path=H5_FILE_PATH,
             subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/validation_subjects.txt",
-            normalize=config.normalize
+            normalize=getattr(config, "normalize", "sample-channel"),  # type: ignore[attr-defined]
+            augment=False
         )
-        
-        # Allow string-encoded params in sweeps (two-level parser)
-        parsed_nf = _parse_two_level(config.n_filters)
-        n_filters: List[int] = [int(x) for x in parsed_nf]
 
-        parsed_ks = _parse_two_level(config.kernel_sizes)
-        kernel_sizes: List[Tuple[int, int]] = [(int(p[0]), int(p[1])) for p in parsed_ks]
-
-        parsed_strides = _parse_two_level(config.strides)
-        strides: List[Tuple[int, int]] = [(int(p[0]), int(p[1])) for p in parsed_strides]
-
-        model = Simple2D3Layers(
-            n_filters=n_filters,
-            kernel_sizes=kernel_sizes,
-            strides=strides,
-            dropout_rate=config.dropout_rate
-        )
+        # Create model using the universal creator
+        model = create_model_from_wandb_config(config, model_type)
 
         run_sweep(model, run, training_dataset, validation_dataset)
-       
+
 if __name__ == "__main__":
     main()
-    # test_parser()

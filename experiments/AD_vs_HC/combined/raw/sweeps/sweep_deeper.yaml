@@ -66,7 +66,7 @@ parameters:
       # - f1
       # - mcc
 
-program: experiments.AD_vs_HC.combined.raw.deeper_sweep
+program: experiments.AD_vs_HC.combined.raw.sweep
 
 command:
   - ${env}
@@ -74,5 +74,6 @@ command:
   - run
   - -m
   - ${program}
+  - Deeper2D
   - ${args}
 

@@ -131,6 +131,103 @@ def load_config(config_filename: str) -> BaseModelConfig:
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
 
+def _parse_two_level(s: str) -> list:
+    """Parse two-level string parameters from wandb sweeps."""
+    s = s.strip()
+    if "__" in s:
+        return [[int(p) for p in g.split("_") if p] for g in s.split("__") if g]
+    return [int(p) for p in s.split("_") if p]
+
+def create_model_from_wandb_config(config, model_type=None):
+    """
+    Create model instance from wandb config.
+    If model_type is not provided, tries to infer from config parameters.
+    """
+    from core.validate_kernel import validate_kernel
+
+    # Parse string-encoded parameters
+    n_filters = [int(x) for x in _parse_two_level(config.n_filters)]
+    kernel_sizes = [(int(p[0]), int(p[1])) for p in _parse_two_level(config.kernel_sizes)]
+    strides = [(int(p[0]), int(p[1])) for p in _parse_two_level(config.strides)]
+
+    # Determine model type if not explicitly provided
+    if model_type is None:
+        # Try to infer from config parameters
+        if hasattr(config, 'activation'):
+            model_type = "DeeperCustom"
+        elif hasattr(config, 'padding_sizes'):
+            # Check if it has 4 layers (Deeper2D) or 3 layers (Improved2D)
+            paddings = [(int(p[0]), int(p[1])) for p in _parse_two_level(config.padding_sizes)]
+            if len(paddings) == 4:
+                model_type = "Deeper2D"
+            else:
+                model_type = "Improved2D"
+        else:
+            model_type = "Simple2D_3layers"
+
+    logger.info(f"Creating model of type: {model_type}")
+
+    if model_type == "DeeperCustom":
+        from models.simple_2d import DeeperCustom
+        paddings = [(int(p[0]), int(p[1])) for p in _parse_two_level(config.padding_sizes)]
+
+        if not validate_kernel(kernel_sizes, strides, paddings, (1000, 68)):
+            logger.error("Kernel configuration is invalid")
+            raise ValueError("Invalid kernel configuration for DeeperCustom")
+
+        return DeeperCustom(
+            n_filters=n_filters,
+            kernel_sizes=kernel_sizes,
+            strides=strides,
+            dropout_rate=config.dropout_rate,
+            paddings=paddings,
+            activation=config.activation
+        )
+
+    elif model_type == "Deeper2D":
+        from models.simple_2d import Deeper2D
+        paddings = [(int(p[0]), int(p[1])) for p in _parse_two_level(config.padding_sizes)]
+
+        if not validate_kernel(kernel_sizes, strides, paddings, (1000, 68)):
+            logger.error("Kernel configuration is invalid")
+            raise ValueError("Invalid kernel configuration for Deeper2D")
+
+        return Deeper2D(
+            n_filters=n_filters,
+            kernel_sizes=kernel_sizes,
+            strides=strides,
+            dropout_rate=config.dropout_rate,
+            paddings=paddings
+        )
+
+    elif model_type == "Improved2D":
+        from models.simple_2d import Improved2D
+        paddings = [(int(p[0]), int(p[1])) for p in _parse_two_level(config.padding_sizes)]
+
+        if not validate_kernel(kernel_sizes, strides, paddings, (1000, 68)):
+            logger.error("Kernel configuration is invalid")
+            raise ValueError("Invalid kernel configuration for Improved2D")
+
+        return Improved2D(
+            n_filters=n_filters,
+            kernel_sizes=kernel_sizes,
+            strides=strides,
+            dropout_rate=config.dropout_rate,
+            paddings=paddings
+        )
+
+    elif model_type == "Simple2D_3layers":
+        from models.simple_2d import Simple2D3Layers
+        return Simple2D3Layers(
+            n_filters=n_filters,
+            kernel_sizes=kernel_sizes,
+            strides=strides,
+            dropout_rate=config.dropout_rate
+        )
+
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
+
 def run_model_playground(config_filenames: List[str], n_folds: int = 5, output_dir: str = "playground_results", h5_file_path: str = "h5test_raw_only.h5"):
     """
     Run cross-validation playground for multiple configs.

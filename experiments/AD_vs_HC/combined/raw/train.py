@@ -1,13 +1,9 @@
-from typing import Tuple, List, Literal
-from dataclasses import dataclass
-
 from core.raw_dataset import RawDataset
-from core.schemas import BaseModelConfig
-from models.simple_2d import DeeperCustom
+from core.model_playground import load_config, create_model
 from core.train_model import train_model
 from dotenv import load_dotenv
 import os
-import yaml # type: ignore[import]
+import sys
 from loguru import logger
 import torch
 import numpy as np
@@ -16,87 +12,43 @@ load_dotenv()
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "h5test_raw_only.h5")
 logger.info(f"H5 file path: {H5_FILE_PATH}")
-WANDB_PROJECT = "AD_vs_HC"
-# WANDB_CONFIG = yaml.load(open("experiments/AD_vs_HC/combined/raw/simple2d3layers.yaml"), Loader=yaml.FullLoader)
-# WANDB_CONFIG = yaml.load(open("experiments/AD_vs_HC/combined/raw/improved2d.yaml"), Loader=yaml.FullLoader)
-# WANDB_CONFIG = yaml.load(open("experiments/AD_vs_HC/combined/raw/deeper.yaml"), Loader=yaml.FullLoader)
-WANDB_CONFIG = yaml.load(open("experiments/AD_vs_HC/combined/raw/custom.yaml"), Loader=yaml.FullLoader)
 
-WANDB_CONFIG["random_seed"] = int(os.getenv("RANDOM_SEED", "42"))
+# Get config file path from command line argument
+if len(sys.argv) != 2:
+    logger.error("Usage: python train.py <config_file>")
+    logger.error("Example: python train.py configs/Improved2D_0928_2024.yaml")
+    sys.exit(1)
+
+config_file = sys.argv[1]
+logger.info(f"Using config file: {config_file}")
+
+# Load configuration using the universal loader
+config = load_config(config_file)
 
 torch.manual_seed(int(os.getenv("RANDOM_SEED", "42")))
 np.random.seed(int(os.getenv("RANDOM_SEED", "42")))
 
-@dataclass
-class Simple2D3LayersConfig(BaseModelConfig):
-    n_filters: List[int]
-    kernel_sizes: List[Tuple[int, int]]
-    strides: List[Tuple[int, int]]
-    dropout_rate: float
-    normalize: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full']
-    pos_weight: float
-
-@dataclass
-class Improved2DConfig(BaseModelConfig):
-    n_filters: List[int]
-    kernel_sizes: List[Tuple[int, int]]
-    strides: List[Tuple[int, int]]
-    dropout_rate: float
-    normalize: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full']
-    pos_weight: float
-    paddings: List[Tuple[int, int]]
-
-@dataclass
-class Deeper2DConfig(BaseModelConfig):
-    n_filters: List[int]
-    kernel_sizes: List[Tuple[int, int]]
-    strides: List[Tuple[int, int]]
-    dropout_rate: float
-    normalize: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full']
-    pos_weight: float
-    paddings: List[Tuple[int, int]]
-
-@dataclass
-class CustomConfig(BaseModelConfig):
-    n_filters: List[int]
-    kernel_sizes: List[Tuple[int, int]]
-    strides: List[Tuple[int, int]]
-    dropout_rate: float
-    normalize: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full']
-    pos_weight: float
-    paddings: List[Tuple[int, int]]
-    activation: str
-    augment: bool
-    augment_prob_pos: float
-    augment_prob_neg: float
-    noise_std: float
 
 
-# config = Simple2D3LayersConfig(**WANDB_CONFIG) # type: ignore
-# model = Simple2D3Layers(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate)
-
-# config = Improved2DConfig(**WANDB_CONFIG) # type: ignore
-config = CustomConfig(**WANDB_CONFIG) # type: ignore
-# model = Deeper2D(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, paddings=config.paddings)
-
-model = DeeperCustom(n_filters=config.n_filters, kernel_sizes=config.kernel_sizes, strides=config.strides, dropout_rate=config.dropout_rate, paddings=config.paddings, activation=config.activation)
+# Create model using the universal creator
+model = create_model(config)
 
 training_dataset = RawDataset(
     h5_file_path=H5_FILE_PATH,
     subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/training_subjects.txt",
-    normalize=config.normalize,
-    augment=config.augment,
+    normalize=getattr(config, "normalize", "sample-channel"),  # type: ignore[attr-defined]
+    augment=bool(getattr(config, "augment", False)),  # type: ignore[attr-defined]
     augment_prob=(
-        config.augment_prob_neg, # neg, pos
-        config.augment_prob_pos
+        float(getattr(config, "augment_prob_neg", 0.5)),  # type: ignore[attr-defined] # neg, pos
+        float(getattr(config, "augment_prob_pos", 0.0))  # type: ignore[attr-defined]
     ),
-    noise_std=config.noise_std
+    noise_std=float(getattr(config, "noise_std", 0.1))  # type: ignore[attr-defined]
 )
 
 validation_dataset = RawDataset(
     h5_file_path=H5_FILE_PATH,
     subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/validation_subjects.txt",
-    normalize=config.normalize,
+    normalize=getattr(config, "normalize", "sample-channel"),  # type: ignore[attr-defined]
     augment=False
 )
 
