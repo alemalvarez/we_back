@@ -12,7 +12,7 @@ logger.info(f"H5 file path: {H5_FILE_PATH}")
 
 
 configs_to_test = sorted(
-    glob.glob("configs/*.yaml")
+    glob.glob(os.path.join("configs", "*.yaml"))
 )
 
 if __name__ == "__main__":
