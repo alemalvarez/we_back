@@ -117,6 +117,8 @@ def load_config(config_filename: str) -> BaseModelConfig:
     with open(config_path) as f:
         config_dict = yaml.safe_load(f)
     config_dict["random_seed"] = int(os.getenv("RANDOM_SEED", "42"))
+    # Set default value for cosine annealing if not specified
+    config_dict.setdefault("use_cosine_annealing", False)
 
     # Determine config class based on model_name
     model_name = config_dict["model_name"]
