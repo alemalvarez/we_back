@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from loguru import logger
-import glob
+from pathlib import Path
 from core.model_playground import run_model_playground
 
 
@@ -12,7 +12,7 @@ logger.info(f"H5 file path: {H5_FILE_PATH}")
 
 
 configs_to_test = sorted(
-    glob.glob(os.path.join("configs", "*.yaml"))
+    str(p) for p in Path("configs").glob("*.yaml")
 )
 
 if __name__ == "__main__":
