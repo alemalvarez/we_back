@@ -100,7 +100,13 @@ def train_model(
     else:
         optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
 
-    logger.success("Optimizer ready")
+    # Create scheduler if cosine annealing is enabled
+    scheduler = None
+    if getattr(config, "use_cosine_annealing", False):
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.max_epochs)
+        logger.success("Optimizer and cosine annealing scheduler ready")
+    else:
+        logger.success("Optimizer ready")
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -149,6 +155,10 @@ def train_model(
         if patience_counter >= config.patience:
             logger.info(f"Early stopping triggered at epoch {epoch+1}")
             break
+
+        # Step the scheduler at the end of each epoch if enabled
+        if scheduler is not None:
+            scheduler.step()
         
     if best_model_state is not None:
         model.load_state_dict(best_model_state)

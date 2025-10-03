@@ -119,6 +119,7 @@ class BaseModelConfig:
     patience: int
     min_delta: float
     early_stopping_metric: Optional[Literal['loss', 'f1', 'mcc']]
+    use_cosine_annealing: bool = False
 
     def __post_init__(self):
         """Log the configuration parameters after initialization."""

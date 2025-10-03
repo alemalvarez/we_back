@@ -28,8 +28,6 @@ config = load_config(config_file)
 torch.manual_seed(int(os.getenv("RANDOM_SEED", "42")))
 np.random.seed(int(os.getenv("RANDOM_SEED", "42")))
 
-
-
 # Create model using the universal creator
 model = create_model(config)
 
