@@ -1,6 +1,4 @@
 from collections.abc import Sized
-from dataclasses import dataclass
-import time
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -9,6 +7,7 @@ import torch.optim as optim
 from core.schemas import BaseModelConfig
 from loguru import logger
 from collections import defaultdict
+from core.training_loop import one_epoch, OneEpochResults
 from sklearn.metrics import ( # type: ignore
     accuracy_score,
     f1_score,
@@ -124,36 +123,39 @@ def train_model(
     best_model_state = None
 
     for epoch in range(config.max_epochs):
-        results: OneEpochResults = _one_epoch(
+        results: OneEpochResults = one_epoch(
             model, 
             criterion, 
             optimizer, 
             train_loader, 
             validation_loader, 
             device,
-            config,
         )
 
-        if results.train_time > 60:
-            logger.warning(f"Epoch {epoch+1} took {results.train_time:.2f} seconds, which is longer than a minute. Stopping training.")
-            break
-
-        logger.info(f"Epoch {epoch+1}/{config.max_epochs} completed in {results.train_time:.4f} seconds")
+        logger.info(f"Epoch {epoch+1}/{config.max_epochs} completed in {results.epoch_time:.4f} seconds")
         logger.info(f"Train Loss: {results.train_loss:.4f}, Train Accuracy: {results.train_accuracy:.2f}")
         logger.info(f"Validation Loss: {results.val_loss:.4f}, Validation Accuracy: {results.val_accuracy:.2f}")
-        logger.info(f"Validation {config.early_stopping_metric}: {results.early_stopping_metric:.4f}")
-        logger.info("="*100)
-
+        logger.info(f"Validation f1: {results.val_f1:.4f}, Validation mcc: {results.val_mcc:.4f}, Validation kappa: {results.val_kappa:.4f}")
+        
+        # Early stopping check
         if config.early_stopping_metric == 'loss':
-            is_better = results.early_stopping_metric < best_early_stopping_metric - config.min_delta
-        else:
-            is_better = results.early_stopping_metric > best_early_stopping_metric + config.min_delta
-
+            early_stopping_metric = results.val_loss
+            is_better = early_stopping_metric < best_early_stopping_metric - config.min_delta
+        elif config.early_stopping_metric == 'f1':
+            early_stopping_metric = results.val_f1
+            is_better = early_stopping_metric > best_early_stopping_metric + config.min_delta
+        elif config.early_stopping_metric == 'mcc':
+            early_stopping_metric = results.val_mcc
+            is_better = early_stopping_metric > best_early_stopping_metric + config.min_delta
+        elif config.early_stopping_metric == 'kappa':
+            early_stopping_metric = results.val_kappa
+            is_better = early_stopping_metric > best_early_stopping_metric + config.min_delta
+            
         if is_better:
-            best_early_stopping_metric = results.early_stopping_metric
+            best_early_stopping_metric = early_stopping_metric
             best_model_state = model.state_dict().copy()
             patience_counter = 0
-            logger.success(f"New best validation {config.early_stopping_metric}: {results.early_stopping_metric:.4f}")
+            logger.success(f"New best validation {config.early_stopping_metric}: {early_stopping_metric:.4f}")
         else:
             patience_counter += 1
 
@@ -166,6 +168,8 @@ def train_model(
             scheduler.step()
             current_lr = optimizer.param_groups[0]['lr']
             logger.info(f"Learning rate after annealing: {current_lr:.6f}")
+
+        logger.info(100*"=")
         
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
@@ -241,96 +245,3 @@ def _final_evaluation(
     logger.info(f"Final recall: {final_recall:.4f}")
     logger.info(f"Final ROC AUC: {final_roc_auc:.4f}")
     logger.info(f"Final MCC: {final_mcc:.4f}")
-
-@dataclass
-class OneEpochResults:
-    train_loss: float
-    train_accuracy: float
-    val_loss: float
-    val_accuracy: float
-    train_time: float
-    early_stopping_metric: float
-
-
-def _one_epoch(
-    model: nn.Module,
-    criterion: nn.Module,
-    optimizer: optim.Optimizer,
-    train_loader: DataLoader,
-    validation_loader: DataLoader,
-    device: torch.device,
-    config: BaseModelConfig,
-) -> OneEpochResults:
-
-    model.train()
-    epoch_loss = 0.0
-    epoch_correct = 0
-    epoch_total = 0
-    epoch_start_time = time.time()
-
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device).float()
-        outputs = model(data).squeeze(1)
-        loss = criterion(outputs, target)
-
-        optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        optimizer.step()
-
-        epoch_loss += loss.item()
-        predictions = (outputs > 0.5).float()
-        epoch_correct += (predictions == target).sum().item()
-        epoch_total += target.size(0)
-
-    avg_loss = epoch_loss / len(train_loader)
-    avg_accuracy = epoch_correct / epoch_total
-
-    model.eval()
-    val_loss = 0.0
-    val_correct = 0
-    val_total = 0
-
-    y_true_list: list[np.ndarray] = []
-    y_pred_list: list[np.ndarray] = []
-    with torch.no_grad():
-        for data, target in validation_loader:
-            data, target = data.to(device), target.to(device).float()
-            logits = model(data).squeeze(1)
-            loss = criterion(logits, target)
-            val_loss += loss.item()
-
-            outputs = torch.sigmoid(logits)
-            predictions = (outputs > 0.5).float()
-
-            y_pred_list.extend(predictions.cpu().numpy())
-            y_true_list.extend(target.cpu().numpy())
-
-            val_correct += (predictions == target).sum().item()
-            val_total += target.size(0)
-
-    avg_val_loss = val_loss / len(validation_loader) # divide by number of batches my bad (its already avgd)
-    avg_val_accuracy = val_correct / val_total
-
-    y_true = np.array(y_true_list)
-    y_pred = np.array(y_pred_list)
-
-    if config.early_stopping_metric == 'loss':
-        early_stopping_metric = avg_val_loss
-    elif config.early_stopping_metric == 'f1':
-        avg_val_f1 = f1_score(y_true, y_pred)
-        early_stopping_metric = avg_val_f1
-    elif config.early_stopping_metric == 'mcc':
-        avg_val_mcc = matthews_corrcoef(y_true, y_pred)
-        early_stopping_metric = avg_val_mcc
-
-    train_time = time.time() - epoch_start_time
-
-    return OneEpochResults(
-        train_loss=avg_loss,
-        train_accuracy=avg_accuracy,
-        val_loss=avg_val_loss,
-        val_accuracy=avg_val_accuracy,
-        train_time=train_time,
-        early_stopping_metric=early_stopping_metric,
-    )
