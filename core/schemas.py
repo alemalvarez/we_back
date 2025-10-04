@@ -169,7 +169,7 @@ class RunConfig:
     patience: int
     min_delta: float
     early_stopping_metric: Optional[Literal['loss', 'f1', 'mcc', 'kappa']] = 'loss' # loss is generaly recommended.
-    normalization: str = 'sample-channel'
+    normalization: Literal['min-max', 'standard', 'none'] = 'standard'
     log_to_wandb: bool = False
     wandb_init: Optional[dict] = None
 
