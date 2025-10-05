@@ -1,23 +1,28 @@
 from torch.utils.data import Dataset
 import h5py  # type: ignore
 import torch
-from typing import Literal, List
+from typing import Literal, List, Optional
 from loguru import logger
 
 class SpectralDataset(Dataset):
     def __init__(self, 
     h5_file_path: str, 
-    subjects_txt_path: str,
+    subjects_txt_path: Optional[str] = None,
     normalize: Literal['min-max', 'standard', 'none'] = 'none',
+    subjects_list: List[str] = [],
     ):
-        with open(subjects_txt_path, 'r') as f:
-            self.subject_ids = [line.strip() for line in f.readlines()]
+        if subjects_list:
+            logger.info(f"Using provided subjects_list with {len(subjects_list)} subjects")
+            self.subject_ids = subjects_list
+        else:
+            assert subjects_txt_path is not None, "subjects_txt_path must be provided if subjects_list is not provided"
+            logger.info(f"Loading features dataset from {h5_file_path} with {len(subjects_txt_path)} subjects")
+            with open(subjects_txt_path, 'r') as f:
+                self.subject_ids = [line.strip() for line in f.readlines()]
 
         features_list = []
         labels_list = []
         self.sample_to_subject: List[str] = []
-
-        logger.info(f"Loading features dataset from {h5_file_path} with {len(self.subject_ids)} subjects")
 
         with h5py.File(h5_file_path, 'r') as f:
             for subj_key in self.subject_ids:

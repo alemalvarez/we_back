@@ -1,11 +1,11 @@
 import torch
 from torch import nn
 from typing import List, Tuple
-from dataclasses import dataclass
-from core.schemas import ModelConfig
+from pydantic import model_validator
+from core.schemas import NetworkConfig
 
-@dataclass
-class DeeperCustomConfig(ModelConfig):
+class DeeperCustomConfig(NetworkConfig):
+    model_name: str = "DeeperCustom"
     n_filters: List[int]
     kernel_sizes: List[Tuple[int, int]]
     strides: List[Tuple[int, int]]
@@ -13,13 +13,13 @@ class DeeperCustomConfig(ModelConfig):
     paddings: List[Tuple[int, int]]
     activation: str
 
-    model_name: str = "DeeperCustom"
-
-    def __post_init__(self):
+    @model_validator(mode="after")
+    def validate_lengths(self):
         assert len(self.n_filters) == 4, "n_filters must have length 4"
         assert len(self.kernel_sizes) == 4, "kernel_sizes must have length 4"
         assert len(self.strides) == 4, "strides must have length 4"
         assert len(self.paddings) == 4, "paddings must have length 4"
+        return self
 
 class DeeperCustom(nn.Module):
     """Simple 2D CNN for EEG data classification.
@@ -76,21 +76,21 @@ class DeeperCustom(nn.Module):
         x = x.flatten(1)
         return self.classifier(x)
 
-@dataclass
-class Deeper2DConfig(ModelConfig):
+class Deeper2DConfig(NetworkConfig):
+    model_name: str = "Deeper2D"
     n_filters: List[int]  # length 4
     kernel_sizes: List[Tuple[int, int]]  # length 4
     strides: List[Tuple[int, int]]  # length 4
     dropout_rate: float
     paddings: List[Tuple[int, int]]  # length 4
 
-    model_name: str = "Deeper2D"
-
-    def __post_init__(self):
+    @model_validator(mode="after")
+    def validate_lengths(self):
         assert len(self.n_filters) == 4, "n_filters must have length 4"
         assert len(self.kernel_sizes) == 4, "kernel_sizes must have length 4"
         assert len(self.strides) == 4, "strides must have length 4"
         assert len(self.paddings) == 4, "paddings must have length 4"
+        return self
 
 class Deeper2D(nn.Module):
     """Simple 2D CNN for EEG data classification.
@@ -166,21 +166,21 @@ class Deeper2D(nn.Module):
         return self.classifier(x)
 
 
-@dataclass
-class Improved2DConfig(ModelConfig):
+class Improved2DConfig(NetworkConfig):
+    model_name: str = "Improved2D"
     n_filters: List[int]
     kernel_sizes: List[Tuple[int, int]]
     strides: List[Tuple[int, int]]
     dropout_rate: float
     paddings: List[Tuple[int, int]]
 
-    model_name: str = "Improved2D"
-
-    def __post_init__(self):
+    @model_validator(mode="after")
+    def validate_lengths(self):
         assert len(self.n_filters) == 3, "n_filters must have length 3"
         assert len(self.kernel_sizes) == 3, "kernel_sizes must have length 3"
         assert len(self.strides) == 3, "strides must have length 3"
         assert len(self.paddings) == 3, "paddings must have length 3"
+        return self
 
 class Improved2D(nn.Module):
     """Simple 2D CNN for EEG data classification.
@@ -252,19 +252,19 @@ class Improved2D(nn.Module):
         x = x.flatten(1)
         return self.classifier(x)
 
-@dataclass
-class Simple2D3LayersConfig(ModelConfig):
+class Simple2D3LayersConfig(NetworkConfig):
+    model_name: str = "Simple2D3Layers"
     n_filters: List[int]
     kernel_sizes: List[Tuple[int, int]]
     strides: List[Tuple[int, int]]
     dropout_rate: float
 
-    model_name: str = "Simple2D3Layers"
-
-    def __post_init__(self):
+    @model_validator(mode="after")
+    def validate_lengths(self):
         assert len(self.n_filters) == 3, "n_filters must have length 3"
         assert len(self.kernel_sizes) == 3, "kernel_sizes must have length 3"
         assert len(self.strides) == 3, "strides must have length 3"
+        return self
 
 class Simple2D3Layers(nn.Module):
     """Simple 2D CNN for EEG data classification.

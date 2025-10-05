@@ -1,12 +1,10 @@
-from dataclasses import dataclass
 import torch
 from torch import nn
 
-from core.schemas import ModelConfig
+from core.schemas import NetworkConfig
 
 
-@dataclass
-class SpectralNetConfig(ModelConfig):
+class SpectralNetConfig(NetworkConfig):
     model_name: str = "SpectralNet"
     input_size: int = 16
     hidden_1_size: int = 32

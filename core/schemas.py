@@ -1,10 +1,15 @@
-from abc import ABC
+
 from dataclasses import dataclass
 import numpy as np
 from typing import Optional
 from loguru import logger
-import dataclasses
 from typing import Literal
+from pydantic import BaseModel, model_validator
+
+class _UnsetSentinel:
+    pass
+
+_UNSET = _UnsetSentinel()
 
 @dataclass 
 class Subject:
@@ -110,8 +115,20 @@ class Subject:
         result += ")"
         return result
 
-@dataclass
-class BaseModelConfig:
+class WarnUnsetDefaultsModel(BaseModel):
+
+    @model_validator(mode="after")
+    def _warn_unset_defaults(self):
+        model_fields = type(self).model_fields
+        for name in model_fields:
+            if name not in self.model_fields_set:
+                logger.warning(
+                    f"{self.__class__.__name__}.{name} left unset; using default: {getattr(self, name)!r}"
+                )
+        return self
+
+
+class BaseModelConfig(WarnUnsetDefaultsModel):
     random_seed: int
     model_name: str
     learning_rate: float
@@ -122,23 +139,12 @@ class BaseModelConfig:
     early_stopping_metric: Optional[Literal['loss', 'f1', 'mcc', 'kappa']] = 'loss' # loss is generaly recommended.
     use_cosine_annealing: bool = False
 
-    def __post_init__(self):
-        """Log the configuration parameters after initialization."""
-        logger.info(f"Initialized configuration for '{self.model_name}':")
-        for field in dataclasses.fields(self):
-            value = getattr(self, field.name)
-            logger.info(f"  > {field.name}: {value}")
-        _warn_if_using_defaults(self)
+    # defaults stay as field defaults; validator warns only when omitted
 
-class ModelConfig(ABC):
+class NetworkConfig(WarnUnsetDefaultsModel):
     model_name: str
 
-    def __post_init__(self):
-        _warn_if_using_defaults(self)
-
-
-@dataclass
-class OptimizerConfig():
+class OptimizerConfig(WarnUnsetDefaultsModel):
     learning_rate: float
     weight_decay: Optional[float] = None
     use_cosine_annealing: bool = False
@@ -146,21 +152,14 @@ class OptimizerConfig():
     cosine_annealing_t_mult: int = 1
     cosine_annealing_eta_min: float = 1e-6
 
-    def __post_init__(self):
-        _warn_if_using_defaults(self)
 
-@dataclass
-class CriterionConfig:
+class CriterionConfig(WarnUnsetDefaultsModel):
     pos_weight_type: Literal['fixed', 'multiplied'] = 'fixed'
     pos_weight_value: float = 1.0
 
-    def __post_init__(self):
-        _warn_if_using_defaults(self)
 
-
-@dataclass
-class RunConfig:
-    model_config: ModelConfig
+class RunConfig(WarnUnsetDefaultsModel):
+    network_config: NetworkConfig
     optimizer_config: OptimizerConfig
     criterion_config: CriterionConfig
     random_seed: int
@@ -172,35 +171,3 @@ class RunConfig:
     normalization: Literal['min-max', 'standard', 'none'] = 'standard'
     log_to_wandb: bool = False
     wandb_init: Optional[dict] = None
-
-    def __post_init__(self):
-        _warn_if_using_defaults(self)
-
-
-def _warn_if_using_defaults(instance: object) -> None:
-    """Emit a warning for any dataclass field left at its default value.
-
-    Keeps fields with default_factory or without defaults untouched.
-    """
-    try:
-        for field in dataclasses.fields(instance):  # type: ignore[arg-type]
-            # Skip fields without an explicit default
-            if field.default is dataclasses.MISSING:
-                continue
-            try:
-                value = getattr(instance, field.name)
-            except Exception:
-                continue
-            default_value = field.default
-            # Conservative equality check; avoids noisy numpy array comparisons
-            try:
-                is_default = value == default_value
-            except Exception:
-                is_default = False
-            if is_default:
-                logger.warning(
-                    f"{instance.__class__.__name__}.{field.name} left at default value: {default_value}"
-                )
-    except Exception:
-        # Best-effort only; never fail construction due to warnings
-        return

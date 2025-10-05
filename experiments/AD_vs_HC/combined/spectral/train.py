@@ -22,7 +22,13 @@ H5_FILE_PATH = os.getenv("H5_FILE_PATH", "artifacts/combined_DK_features_only:v0
 
 
 if __name__ == "__main__":
-    model_config = SpectralNetConfig()
+    network_config = SpectralNetConfig(
+        model_name="SpectralNet",
+        input_size=16,
+        hidden_1_size=32,
+        hidden_2_size=16,
+        dropout_rate=0.5,
+    )
     optimizer_config = OptimizerConfig(
         learning_rate=0.003111076215981144,
         weight_decay=0.00027819671966625116,
@@ -34,7 +40,7 @@ if __name__ == "__main__":
     )
 
     run_config = RunConfig(
-        model_config=model_config,
+        network_config=network_config,
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         random_seed=42,
@@ -59,24 +65,27 @@ if __name__ == "__main__":
         normalize=run_config.normalization,
     )
 
+    magic_logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)
+
     trained_model = run_single(
         config=run_config,
         training_dataset=training_dataset,
         validation_dataset=validation_dataset,
+        logger_sink=magic_logger,
     )
-
-    logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)
     
     result = evaluate_with_config(
         model=trained_model,
         dataset=validation_dataset,
         run_config=run_config,
-        logger_sink=logger,
+        logger_sink=magic_logger,
         prefix="val",
     )
 
     pretty_print_per_subject(result.per_subject)
    
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    save_path = os.path.join(script_dir, f"{model_config.model_name}_trained.pt")
+    save_path = os.path.join(script_dir, f"{network_config.model_name}_trained.pt")
     torch.save(trained_model.state_dict(), save_path)
+    
+    magic_logger.finish()

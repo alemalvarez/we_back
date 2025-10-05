@@ -1,11 +1,11 @@
 from torch import nn
 import torch
 import torch.optim as optim
-from core.schemas import ModelConfig, OptimizerConfig, CriterionConfig
+from core.schemas import NetworkConfig, OptimizerConfig, CriterionConfig
 from models.simple_2d import Simple2D3Layers, DeeperCustom, Deeper2D, Improved2D
 from models.spectral_net import SpectralNet
 
-def build_model(config: ModelConfig) -> nn.Module: 
+def build_model(config: NetworkConfig) -> nn.Module: 
     name_class_map = {
         "DeeperCustom": DeeperCustom,
         "Deeper2D": Deeper2D,

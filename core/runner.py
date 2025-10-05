@@ -1,6 +1,7 @@
+from typing import Optional
 from core.schemas import RunConfig
 from core.builders import build_model, build_optimizer, build_scheduler, build_criterion
-from core.logging import make_logger
+from core.logging import make_logger, Logger
 from torch.utils.data import Dataset, DataLoader
 import torch
 import numpy as np
@@ -37,6 +38,7 @@ def run(
     config: RunConfig,
     training_dataset: Dataset,
     validation_dataset: Dataset,
+    logger_sink: Optional[Logger] = None,
     ):
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
@@ -46,13 +48,13 @@ def run(
     train_loader = DataLoader(training_dataset, batch_size=config.batch_size, shuffle=True, pin_memory=True)
     validation_loader = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 
-    model = build_model(config.model_config)
+    model = build_model(config.network_config)
     model = model.to(device)
 
     optimizer = build_optimizer(config.optimizer_config, model)
     scheduler = build_scheduler(config.optimizer_config, optimizer)
     criterion = build_criterion(config.criterion_config, _count_pos_neg(training_dataset))
-    magic_logger = make_logger(wandb_enabled=config.log_to_wandb, wandb_init=config.wandb_init)
+    magic_logger = logger_sink or make_logger(wandb_enabled=config.log_to_wandb, wandb_init=config.wandb_init)
     magic_logger.watch(model)
 
     total_params = sum(p.numel() for p in model.parameters())
@@ -131,5 +133,7 @@ def run(
         model.load_state_dict(best_state)  # type: ignore[arg-type]
         logger.success("Best model weights restored")
 
-    magic_logger.finish()
+    if logger_sink is None:
+        magic_logger.finish()
+
     return model

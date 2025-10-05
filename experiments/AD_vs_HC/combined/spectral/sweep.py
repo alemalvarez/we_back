@@ -3,6 +3,7 @@ from typing import Literal
 
 import wandb
 
+from core.logging import make_logger
 from core.spectral_dataset import SpectralDataset
 from core.schemas import (
     OptimizerConfig,
@@ -10,6 +11,7 @@ from core.schemas import (
     RunConfig,
 )
 from core.runner import run as run_single
+from core.evaluation import evaluate_with_config
 from models.spectral_net import SpectralNetConfig
 from dotenv import load_dotenv
 
@@ -17,7 +19,7 @@ load_dotenv()
 
 
 def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore[name-defined]
-    model_config = SpectralNetConfig(
+    network_config = SpectralNetConfig(
         model_name="SpectralNet",
         input_size=int(cfg.get("input_size", 16)),
         hidden_1_size=int(cfg.get("hidden_1_size", 16)),
@@ -48,7 +50,7 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
     norm_lit: Literal['min-max','standard','none'] = norm_str if norm_str in ("min-max","standard","none") else "standard"  # type: ignore[assignment]
 
     run_config = RunConfig(
-        model_config=model_config,
+        network_config=network_config,
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         random_seed=int(cfg.get("random_seed", 42)),
@@ -85,6 +87,8 @@ def main() -> None:
     )
 
     run_config = build_run_config_from_wandb(cfg)
+    
+    magic_logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)
 
     training_dataset = SpectralDataset(
         h5_file_path=h5_file_path,
@@ -97,11 +101,22 @@ def main() -> None:
         normalize=run_config.normalization,  # type: ignore[arg-type]
     )
 
-    run_single(
+    trained_model = run_single(
         config=run_config,
         training_dataset=training_dataset,
         validation_dataset=validation_dataset,
+        logger_sink=magic_logger,
     )
+
+    evaluate_with_config(
+        model=trained_model,
+        dataset=validation_dataset,
+        run_config=run_config,
+        logger_sink=magic_logger,
+        prefix="val",
+    )
+
+    magic_logger.finish()
 
 
 if __name__ == "__main__":

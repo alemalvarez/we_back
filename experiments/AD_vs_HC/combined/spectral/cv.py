@@ -53,7 +53,7 @@ def main() -> None:
         val_subjects = val_path
 
         run_config = RunConfig(
-            model_config=model_config,
+            network_config=model_config,
             optimizer_config=optimizer_config,
             criterion_config=criterion_config,
             random_seed=42,
