@@ -116,15 +116,24 @@ class Subject:
         return result
 
 class WarnUnsetDefaultsModel(BaseModel):
+    _warnings_shown: bool = False
 
     @model_validator(mode="after")
     def _warn_unset_defaults(self):
+        # Only show warnings once per instance to avoid duplicate warnings
+        # when the model is used as a nested field in another model
+        if self._warnings_shown:
+            return self
+
         model_fields = type(self).model_fields
         for name in model_fields:
             if name not in self.model_fields_set:
                 logger.warning(
                     f"{self.__class__.__name__}.{name} left unset; using default: {getattr(self, name)!r}"
                 )
+
+        # Mark that warnings have been shown for this instance
+        object.__setattr__(self, '_warnings_shown', True)
         return self
 
 

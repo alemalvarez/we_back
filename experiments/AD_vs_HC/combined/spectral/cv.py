@@ -1,6 +1,7 @@
 import os
 from typing import List
 
+import numpy as np
 from loguru import logger
 from sklearn.model_selection import StratifiedKFold  # type: ignore
 
@@ -12,6 +13,7 @@ from core.schemas import (
 )
 from core.runner import run as run_single
 from core.evaluation import evaluate_with_config, pretty_print_per_subject
+from core.logging import make_logger
 
 from models.spectral_net import SpectralNetConfig
 
@@ -30,6 +32,14 @@ def _subject_type(subject_id: str) -> str:
     elif subject_id.startswith("HC"):
         return "HC"
     return "UNKNOWN"
+
+def _count_by_category(subjects: List[str]) -> dict[str, int]:
+    counts = {"ADMIL": 0, "ADMOD": 0, "HC": 0}
+    for subject in subjects:
+        category = _subject_type(subject)
+        if category in counts:
+            counts[category] += 1
+    return counts
 
 def main() -> None:
     h5_file_path = os.getenv(
@@ -69,26 +79,35 @@ def main() -> None:
         pos_weight_value=1.0,
     )
 
+    run_config = RunConfig(
+        network_config=model_config,
+        optimizer_config=optimizer_config,
+        criterion_config=criterion_config,
+        random_seed=42,
+        batch_size=32,
+        max_epochs=50,
+        patience=1,
+        min_delta=0.001,
+        early_stopping_metric='mcc',
+        normalization='standard',
+        log_to_wandb=False,
+        wandb_init=None,
+    )
+
+    magic_logger = make_logger(wandb_enabled=False, wandb_init=None)
+
     for fold_idx in range(n_folds):
         val_fold = folds[fold_idx]
         train_fold = [s for i, fold in enumerate(folds) if i != fold_idx for s in fold]
 
-        logger.info(f"Fold {fold_idx+1}: train={len(train_fold)} subjects, val={len(val_fold)} subjects")
+        # Log validation subject IDs exactly once per fold
+        logger.info(f"Fold {fold_idx+1} validation subjects: {sorted(val_fold)}")
 
-        run_config = RunConfig(
-            network_config=model_config,
-            optimizer_config=optimizer_config,
-            criterion_config=criterion_config,
-            random_seed=42,
-            batch_size=32,
-            max_epochs=50,
-            patience=15,
-            min_delta=0.001,
-            early_stopping_metric='mcc',
-            normalization='standard',
-            log_to_wandb=False,
-            wandb_init=None,
-        )
+        # Count subjects by category for metrics
+        train_counts = _count_by_category(train_fold)
+        val_counts = _count_by_category(val_fold)
+
+        logger.info(f"Fold {fold_idx+1}: train={len(train_fold)} subjects ({train_counts}), val={len(val_fold)} subjects ({val_counts})")
 
         training_dataset = SpectralDataset(
             h5_file_path=h5_file_path,
@@ -105,23 +124,31 @@ def main() -> None:
             config=run_config,
             training_dataset=training_dataset,
             validation_dataset=validation_dataset,
+            logger_sink=magic_logger,
         )
 
         eval_res = evaluate_with_config(
             model=trained_model,
             dataset=validation_dataset,
             run_config=run_config,
-            logger_sink=None,
+            logger_sink=magic_logger,
             prefix=f"fold{fold_idx+1}__val",
         )
         pretty_print_per_subject(eval_res.per_subject, title=f"Fold {fold_idx+1} per-subject")
 
-        fold_metrics.append(dict(eval_res.metrics))
+        fold_metrics.append(eval_res.metrics)
+
+        # Clear separator between folds
+        if fold_idx < n_folds - 1:
+            logger.info("=" * 40 + f" FOLD {fold_idx+1} " + "=" * 40)
 
     keys = [
-        "final_accuracy", "final_f1", "final_precision", "final_recall", "final_mcc", "final_roc_auc", "final_loss"
+        "final_accuracy", "final_f1", "final_precision", "final_recall", "final_mcc", "final_roc_auc", "final_loss",
+        "final_tn", "final_fp", "final_fn", "final_tp"
     ]
-    summary = {}
+    # Compute and log CV summary metrics
+    cv_summary_metrics = {}
+    logger.info("CV summary (across folds):")
     for key in keys:
         vals = []
         for m in fold_metrics:
@@ -129,11 +156,15 @@ def main() -> None:
             if found:
                 vals.append(float(found[0]))
         if vals:
-            summary[key] = sum(vals) / len(vals)
+            vals_array = np.array(vals)
+            cv_summary_metrics[f"cv/{key}_min"] = vals_array.min()
+            cv_summary_metrics[f"cv/{key}_max"] = vals_array.max()
+            cv_summary_metrics[f"cv/{key}_mean"] = vals_array.mean()
+            cv_summary_metrics[f"cv/{key}_std"] = vals_array.std()
+            logger.info(f"  {key}: min={vals_array.min():.4f}, max={vals_array.max():.4f}, mean={vals_array.mean():.4f}, std={vals_array.std():.4f}")
 
-    logger.info("CV summary (mean across folds):")
-    for k, v in summary.items():
-        logger.info(f"  {k}: {v:.4f}")
+    # Log CV summary metrics with magic logger
+    magic_logger.log_metrics(cv_summary_metrics)
 
 
 if __name__ == "__main__":
