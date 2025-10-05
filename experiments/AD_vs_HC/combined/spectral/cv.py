@@ -1,8 +1,8 @@
-import glob
 import os
 from typing import List
 
 from loguru import logger
+from sklearn.model_selection import StratifiedKFold  # type: ignore
 
 from core.spectral_dataset import SpectralDataset
 from core.schemas import (
@@ -22,6 +22,14 @@ def _read_subjects(path: str) -> List[str]:
     with open(path, "r") as f:
         return [line.strip() for line in f if line.strip()]
 
+def _subject_type(subject_id: str) -> str:
+    if subject_id.startswith("ADMIL"):
+        return "ADMIL"
+    elif subject_id.startswith("ADMOD"):
+        return "ADMOD"
+    elif subject_id.startswith("HC"):
+        return "HC"
+    return "UNKNOWN"
 
 def main() -> None:
     h5_file_path = os.getenv(
@@ -30,9 +38,26 @@ def main() -> None:
     )
 
     splits_dir = "experiments/AD_vs_HC/combined/spectral/splits"
-    train_files = sorted(glob.glob(os.path.join(splits_dir, "training_subjects_fold*.txt")))
-    val_files = sorted(glob.glob(os.path.join(splits_dir, "validation_subjects_fold*.txt")))
-    assert len(train_files) == len(val_files) and len(train_files) > 0, "No CV folds found"
+    train_subjects_path = os.path.join(splits_dir, "training_subjects.txt")
+    val_subjects_path = os.path.join(splits_dir, "validation_subjects.txt")
+
+    train_subjects = _read_subjects(train_subjects_path)
+    val_subjects = _read_subjects(val_subjects_path)
+
+    all_subjects = train_subjects + val_subjects
+
+    n_folds = 5
+    assert len(all_subjects) >= n_folds, "Not enough subjects for the number of folds"
+
+    # Use StratifiedKFold for proper stratified splitting by category
+    labels = [_subject_type(sid) for sid in all_subjects]
+    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
+
+    folds: List[List[str]] = []
+    for _, test_idx in skf.split(all_subjects, labels):
+        folds.append([all_subjects[i] for i in test_idx])
+
+    fold_metrics: List[dict] = []
 
     model_config = SpectralNetConfig()
     optimizer_config = OptimizerConfig(
@@ -44,13 +69,11 @@ def main() -> None:
         pos_weight_value=1.0,
     )
 
-    fold_metrics: List[dict] = []
+    for fold_idx in range(n_folds):
+        val_fold = folds[fold_idx]
+        train_fold = [s for i, fold in enumerate(folds) if i != fold_idx for s in fold]
 
-    for fold_idx, (train_path, val_path) in enumerate(zip(train_files, val_files)):
-        logger.info(f"Fold {fold_idx+1}: train={os.path.basename(train_path)}, val={os.path.basename(val_path)}")
-
-        train_subjects = train_path
-        val_subjects = val_path
+        logger.info(f"Fold {fold_idx+1}: train={len(train_fold)} subjects, val={len(val_fold)} subjects")
 
         run_config = RunConfig(
             network_config=model_config,
@@ -69,12 +92,12 @@ def main() -> None:
 
         training_dataset = SpectralDataset(
             h5_file_path=h5_file_path,
-            subjects_txt_path=train_subjects,
+            subjects_list=train_fold,
             normalize=run_config.normalization,
         )
         validation_dataset = SpectralDataset(
             h5_file_path=h5_file_path,
-            subjects_txt_path=val_subjects,
+            subjects_list=val_fold,
             normalize=run_config.normalization,
         )
 
@@ -95,7 +118,6 @@ def main() -> None:
 
         fold_metrics.append(dict(eval_res.metrics))
 
-    # Aggregate: simple mean across folds for common metrics
     keys = [
         "final_accuracy", "final_f1", "final_precision", "final_recall", "final_mcc", "final_roc_auc", "final_loss"
     ]
@@ -103,7 +125,6 @@ def main() -> None:
     for key in keys:
         vals = []
         for m in fold_metrics:
-            # find prefixed key in this fold
             found = [v for k, v in m.items() if k.endswith("/" + key)]
             if found:
                 vals.append(float(found[0]))
@@ -117,5 +138,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
