@@ -9,7 +9,7 @@ class SpectralDataset(Dataset):
     h5_file_path: str, 
     subjects_txt_path: Optional[str] = None,
     normalize: Literal['min-max', 'standard', 'none'] = 'none',
-    subjects_list: List[str] = [],
+    subjects_list: Optional[List[str]] = None,
     ):
         if subjects_list:
             logger.info(f"Using provided subjects_list with {len(subjects_list)} subjects")

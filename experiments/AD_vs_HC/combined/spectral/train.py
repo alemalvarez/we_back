@@ -2,11 +2,12 @@ import os
 import torch
 from dotenv import load_dotenv
 
-from core.spectral_dataset import SpectralDataset
+from core.builders import build_dataset
 from core.schemas import (
     OptimizerConfig,
     CriterionConfig,
     RunConfig,
+    SpectralDatasetConfig,
 )
 from core.runner import run as run_single
 from core.evaluation import evaluate_with_config, pretty_print_per_subject
@@ -39,6 +40,11 @@ if __name__ == "__main__":
         pos_weight_value=1.0,
     )
 
+    dataset_config = SpectralDatasetConfig(
+        h5_file_path=H5_FILE_PATH,
+        spectral_normalization='standard',
+    )
+
     run_config = RunConfig(
         network_config=network_config,
         optimizer_config=optimizer_config,
@@ -49,20 +55,21 @@ if __name__ == "__main__":
         patience=5,
         min_delta=0.001,
         early_stopping_metric='mcc',
-        normalization='standard',
+        dataset_config=dataset_config,
         log_to_wandb=False,
     )
-
-    training_dataset = SpectralDataset(
-        h5_file_path=H5_FILE_PATH,
-        subjects_txt_path="experiments/AD_vs_HC/combined/spectral/splits/training_subjects.txt",
-        normalize=run_config.normalization,
+    
+    
+    training_dataset = build_dataset(
+        dataset_config,
+        subjects_path="experiments/AD_vs_HC/combined/spectral/splits/training_subjects.txt",
+        validation=False
     )
 
-    validation_dataset = SpectralDataset(
-        h5_file_path=H5_FILE_PATH,
-        subjects_txt_path="experiments/AD_vs_HC/combined/spectral/splits/validation_subjects.txt",
-        normalize=run_config.normalization,
+    validation_dataset = build_dataset(
+        dataset_config,
+        subjects_path="experiments/AD_vs_HC/combined/spectral/splits/validation_subjects.txt",
+        validation=True
     )
 
     magic_logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)

@@ -1,7 +1,7 @@
 
 from dataclasses import dataclass
 import numpy as np
-from typing import Optional
+from typing import Optional, List, Tuple
 from loguru import logger
 from typing import Literal
 from pydantic import BaseModel, model_validator
@@ -166,17 +166,31 @@ class CriterionConfig(WarnUnsetDefaultsModel):
     pos_weight_type: Literal['fixed', 'multiplied'] = 'fixed'
     pos_weight_value: float = 1.0
 
+class DatasetConfig(WarnUnsetDefaultsModel):
+    h5_file_path: str
+
+class SpectralDatasetConfig(DatasetConfig):
+    dataset_type: Literal['spectral'] = 'spectral'
+    spectral_normalization: Literal['min-max', 'standard', 'none'] = 'none'
+
+class RawDatasetConfig(DatasetConfig):
+    dataset_type: Literal['raw'] = 'raw'
+    raw_normalization: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full'] = 'sample-channel'
+    augment: bool = False
+    augment_prob: Tuple[float, float] = (0.5, 0.0)
+    noise_std: float = 0.1
+
 
 class RunConfig(WarnUnsetDefaultsModel):
     network_config: NetworkConfig
     optimizer_config: OptimizerConfig
     criterion_config: CriterionConfig
+    dataset_config: DatasetConfig
     random_seed: int
     batch_size: int
     max_epochs: int
     patience: int
     min_delta: float
     early_stopping_metric: Optional[Literal['loss', 'f1', 'mcc', 'kappa']] = 'loss' # loss is generaly recommended.
-    normalization: Literal['min-max', 'standard', 'none'] = 'standard'
     log_to_wandb: bool = False
     wandb_init: Optional[dict] = None

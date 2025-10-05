@@ -1,9 +1,13 @@
+from typing import List, Literal, Optional
 from torch import nn
 import torch
 import torch.optim as optim
-from core.schemas import NetworkConfig, OptimizerConfig, CriterionConfig
+from torch.utils.data import Dataset
+from core.schemas import NetworkConfig, OptimizerConfig, CriterionConfig, DatasetConfig, SpectralDatasetConfig, RawDatasetConfig
 from models.simple_2d import Simple2D3Layers, DeeperCustom, Deeper2D, Improved2D
 from models.spectral_net import SpectralNet
+from core.spectral_dataset import SpectralDataset
+from core.raw_dataset import RawDataset
 
 def build_model(config: NetworkConfig) -> nn.Module: 
     name_class_map = {
@@ -33,3 +37,34 @@ def build_criterion(config: CriterionConfig, dataset_pos_neg: tuple[int, int]) -
     else:
         pos_weight = config.pos_weight_value * (dataset_pos_neg[0] / dataset_pos_neg[1])
         return nn.BCEWithLogitsLoss(pos_weight=torch.tensor(pos_weight))
+
+def build_dataset(config: DatasetConfig, subjects_path: Optional[str] = None, subjects_list: Optional[List[str]] = None, validation: bool = False) -> Dataset:
+    if isinstance(config, SpectralDatasetConfig):
+        return SpectralDataset(
+            config.h5_file_path,
+            subjects_path,
+            config.spectral_normalization,
+            subjects_list
+        )
+    else:
+        assert isinstance(config, RawDatasetConfig)
+        if validation:
+            return RawDataset(
+                h5_file_path=config.h5_file_path,
+                subjects_txt_path=subjects_path,
+                normalize=config.raw_normalization,
+                augment=False,
+                augment_prob=config.augment_prob,
+                noise_std=config.noise_std,
+                subjects_list=subjects_list
+            )
+        else:
+            return RawDataset(
+                h5_file_path=config.h5_file_path,
+                subjects_txt_path=subjects_path,
+                normalize=config.raw_normalization,
+                augment=config.augment,
+                augment_prob=config.augment_prob,
+                noise_std=config.noise_std,
+                subjects_list=subjects_list
+            )

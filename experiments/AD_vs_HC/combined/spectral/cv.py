@@ -5,11 +5,12 @@ import numpy as np
 from loguru import logger
 from sklearn.model_selection import StratifiedKFold  # type: ignore
 
-from core.spectral_dataset import SpectralDataset
+from core.builders import build_dataset
 from core.schemas import (
     OptimizerConfig,
     CriterionConfig,
     RunConfig,
+    SpectralDatasetConfig,
 )
 from core.runner import run as run_single
 from core.evaluation import evaluate_with_config, pretty_print_per_subject
@@ -79,6 +80,11 @@ def main() -> None:
         pos_weight_value=1.0,
     )
 
+    dataset_config = SpectralDatasetConfig(
+        h5_file_path=h5_file_path,
+        spectral_normalization='standard',
+    )
+
     run_config = RunConfig(
         network_config=model_config,
         optimizer_config=optimizer_config,
@@ -89,7 +95,7 @@ def main() -> None:
         patience=1,
         min_delta=0.001,
         early_stopping_metric='mcc',
-        normalization='standard',
+        dataset_config=dataset_config,
         log_to_wandb=False,
         wandb_init=None,
     )
@@ -109,15 +115,15 @@ def main() -> None:
 
         logger.info(f"Fold {fold_idx+1}: train={len(train_fold)} subjects ({train_counts}), val={len(val_fold)} subjects ({val_counts})")
 
-        training_dataset = SpectralDataset(
-            h5_file_path=h5_file_path,
+        training_dataset = build_dataset(
+            dataset_config,
             subjects_list=train_fold,
-            normalize=run_config.normalization,
+            validation=False
         )
-        validation_dataset = SpectralDataset(
-            h5_file_path=h5_file_path,
+        validation_dataset = build_dataset(
+            dataset_config, 
             subjects_list=val_fold,
-            normalize=run_config.normalization,
+            validation=True
         )
 
         trained_model = run_single(
