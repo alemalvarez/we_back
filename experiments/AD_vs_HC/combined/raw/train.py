@@ -5,10 +5,29 @@ import os
 import sys
 from loguru import logger
 import torch
-import yaml
-from models.simple_2d import DeeperCustomConfig
+import yaml # type: ignore[import]
+from models.simple_2d import DeeperCustomConfig, Deeper2DConfig, Improved2DConfig, Simple2D3LayersConfig
 from core.runner import run as run_single
 from core.logging import make_logger
+from typing import Dict, Any, Type, TypeVar
+
+T = TypeVar('T')
+
+# Mapping of model names to their config classes
+NETWORK_CONFIG_CLASSES = {
+    "DeeperCustom": DeeperCustomConfig,
+    "Deeper2D": Deeper2DConfig,
+    "Improved2D": Improved2DConfig,
+    "Simple2D3Layers": Simple2D3LayersConfig,
+}
+
+def filter_config_params(config_class: Type[T], config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Filter config dict to only include parameters expected by the config class.
+
+    This allows WarnUnsetDefaultsModel to warn about missing parameters that fall back to defaults.
+    """
+    expected_params = set(config_class.__annotations__.keys())
+    return {k: v for k, v in config_dict.items() if k in expected_params}
 
 load_dotenv()
 
@@ -24,7 +43,6 @@ if len(sys.argv) != 2:
 config_file = sys.argv[1]
 logger.info(f"Using config file: {config_file}")
 
-# Load configuration using the universal loader
 if os.path.isabs(config_file):
     config_path = config_file
 else:
@@ -32,52 +50,41 @@ else:
 with open(config_path) as f:
     config_dict = yaml.safe_load(f)
 
-network_config = DeeperCustomConfig(
-    model_name="DeeperCustom",
-    n_filters=config_dict["n_filters"],
-    kernel_sizes=config_dict["kernel_sizes"],
-    strides=config_dict["strides"],
-    dropout_rate=config_dict["dropout_rate"],
-    paddings=config_dict["paddings"],
-    activation=config_dict["activation"],
-)
+# Handle parameter name mappings
+config_dict["model_name"] = config_dict.get("model_name", "DeeperCustom")
+config_dict["pos_weight_value"] = config_dict.get("pos_weight", 1.0)
+config_dict["pos_weight_type"] = "fixed"  # Default to fixed, could be made configurable
+config_dict["augment_prob"] = (config_dict.get("augment_prob_neg", 0.5), config_dict.get("augment_prob_pos", 0.0))
 
-optimizer_config = OptimizerConfig(
-    learning_rate=config_dict["learning_rate"],
-    weight_decay=config_dict["weight_decay"],
-    use_cosine_annealing=config_dict["use_cosine_annealing"],
-    cosine_annealing_t_0=config_dict["cosine_annealing_t_0"],
-    cosine_annealing_t_mult=config_dict["cosine_annealing_t_mult"],
-    cosine_annealing_eta_min=config_dict["cosine_annealing_eta_min"],
-)
+# Dynamically choose network config class based on model_name
+model_name = config_dict["model_name"]
+if model_name not in NETWORK_CONFIG_CLASSES:
+    available_models = list(NETWORK_CONFIG_CLASSES.keys())
+    logger.error(f"Unknown model_name '{model_name}'. Available models: {available_models}")
+    sys.exit(1)
 
-criterion_config = CriterionConfig(
-    pos_weight_type=config_dict["pos_weight_type"],
-    pos_weight_value=config_dict["pos_weight_value"],
-)
-dataset_config = RawDatasetConfig(
-    h5_file_path=H5_FILE_PATH,
-    dataset_type="raw",
-    raw_normalization=config_dict["normalize"],
-    augment=config_dict["augment"],
-    augment_prob=(config_dict["augment_prob_neg"], config_dict["augment_prob_pos"]),
-    noise_std=config_dict["noise_std"],
-)
+network_config_class = NETWORK_CONFIG_CLASSES[model_name]
+network_config = network_config_class(**filter_config_params(network_config_class, config_dict)) # type: ignore[arg-type]
+optimizer_config = OptimizerConfig(**filter_config_params(OptimizerConfig, config_dict))
+criterion_config = CriterionConfig(**filter_config_params(CriterionConfig, config_dict))
 
-run_config = RunConfig(
-    network_config=network_config,
-    optimizer_config=optimizer_config,
-    criterion_config=criterion_config,
-    dataset_config=dataset_config,
-    random_seed=config_dict["random_seed"],
-    batch_size=config_dict["batch_size"],
-    max_epochs=config_dict["max_epochs"],
-    patience=config_dict["patience"],
-    min_delta=config_dict["min_delta"],
-    early_stopping_metric=config_dict["early_stopping_metric"],
-    log_to_wandb=False,
-    wandb_init=None,
-)
+# Dataset config needs special handling for h5_file_path
+dataset_params = filter_config_params(RawDatasetConfig, config_dict)
+dataset_params["h5_file_path"] = H5_FILE_PATH
+dataset_params["dataset_type"] = "raw"
+dataset_config = RawDatasetConfig(**dataset_params)
+
+# Run config needs special handling for nested configs and defaults
+run_params = filter_config_params(RunConfig, config_dict)
+run_params.update({
+    "network_config": network_config,
+    "optimizer_config": optimizer_config,
+    "criterion_config": criterion_config,
+    "dataset_config": dataset_config,
+    "log_to_wandb": False,
+    "wandb_init": None,
+})
+run_config = RunConfig(**run_params)
 
 training_dataset = build_dataset(
     dataset_config,
