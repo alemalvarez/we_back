@@ -33,6 +33,7 @@ load_dotenv()
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "h5test_raw_only.h5")
 logger.info(f"H5 file path: {H5_FILE_PATH}")
+RANDOM_SEED = int(os.getenv("RANDOM_SEED", "42"))
 
 # Get config file path from command line argument
 if len(sys.argv) != 2:
@@ -83,6 +84,7 @@ run_params.update({
     "dataset_config": dataset_config,
     "log_to_wandb": False,
     "wandb_init": None,
+    "random_seed": RANDOM_SEED,
 })
 run_config = RunConfig(**run_params)
 
