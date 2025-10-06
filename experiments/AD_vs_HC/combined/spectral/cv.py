@@ -63,11 +63,11 @@ def main() -> None:
         min_delta=0.001,
         early_stopping_metric='loss',
         dataset_config=dataset_config,
-        log_to_wandb=False,
+        log_to_wandb=True,
         wandb_init=None,
     )
 
-    magic_logger = make_logger(wandb_enabled=False, wandb_init=None)
+    magic_logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)
 
     run_cv(
         all_subjects=all_subjects,

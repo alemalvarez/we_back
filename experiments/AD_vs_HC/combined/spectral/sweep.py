@@ -3,12 +3,13 @@ from typing import Literal
 
 import wandb
 
+from core.builders import build_dataset
 from core.logging import make_logger
-from core.spectral_dataset import SpectralDataset
 from core.schemas import (
     OptimizerConfig,
     CriterionConfig,
     RunConfig,
+    SpectralDatasetConfig,
 )
 from core.runner import run as run_single
 from core.evaluation import evaluate_with_config
@@ -49,6 +50,12 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
     norm_str = str(cfg.get("normalization", "standard"))
     norm_lit: Literal['min-max','standard','none'] = norm_str if norm_str in ("min-max","standard","none") else "standard"  # type: ignore[assignment]
 
+
+    h5_file_path = os.getenv(
+        "H5_FILE_PATH",
+        "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5",
+    )
+
     run_config = RunConfig(
         network_config=network_config,
         optimizer_config=optimizer_config,
@@ -59,7 +66,10 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         patience=int(cfg.get("patience", 15)),
         min_delta=float(cfg.get("min_delta", 0.001)),
         early_stopping_metric=esm_lit,
-        normalization=norm_lit,
+        dataset_config=SpectralDatasetConfig(
+            h5_file_path=h5_file_path,
+            spectral_normalization=norm_lit,
+        ),
         log_to_wandb=True,
         wandb_init=None,
     )
@@ -73,10 +83,6 @@ def main() -> None:
 
     cfg = wandb.config
 
-    h5_file_path = os.getenv(
-        "H5_FILE_PATH",
-        "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5",
-    )
     train_subjects = os.getenv(
         "TRAIN_SUBJECTS",
         "experiments/AD_vs_HC/combined/spectral/splits/training_subjects.txt",
@@ -90,15 +96,15 @@ def main() -> None:
     
     magic_logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)
 
-    training_dataset = SpectralDataset(
-        h5_file_path=h5_file_path,
-        subjects_txt_path=train_subjects,
-        normalize=run_config.normalization,  # type: ignore[arg-type]
+    training_dataset = build_dataset(
+        run_config.dataset_config,
+        subjects_path=train_subjects,
+        validation=False,
     )
-    validation_dataset = SpectralDataset(
-        h5_file_path=h5_file_path,
-        subjects_txt_path=val_subjects,
-        normalize=run_config.normalization,  # type: ignore[arg-type]
+    validation_dataset = build_dataset(
+        run_config.dataset_config,
+        subjects_path=val_subjects,
+        validation=True,
     )
 
     trained_model = run_single(
