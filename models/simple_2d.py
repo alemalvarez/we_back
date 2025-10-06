@@ -336,3 +336,9 @@ class Simple2D3Layers(nn.Module):
         x = x.flatten(1)
         return self.classifier(x)
 
+NETWORK_CONFIG_CLASSES = {
+    "DeeperCustom": DeeperCustomConfig,
+    "Deeper2D": Deeper2DConfig,
+    "Improved2D": Improved2DConfig,
+    "Simple2D3Layers": Simple2D3LayersConfig,
+}

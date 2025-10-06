@@ -1,7 +1,8 @@
 
 from dataclasses import dataclass
+from typing_extensions import Type, TypeVar
 import numpy as np
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any
 from loguru import logger
 from typing import Literal
 from pydantic import BaseModel, model_validator
@@ -194,3 +195,13 @@ class RunConfig(WarnUnsetDefaultsModel):
     early_stopping_metric: Optional[Literal['loss', 'f1', 'mcc', 'kappa']] = 'loss' # loss is generaly recommended.
     log_to_wandb: bool = False
     wandb_init: Optional[dict] = None
+
+T = TypeVar('T')
+
+def filter_config_params(config_class: Type[T], config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Filter config dict to only include parameters expected by the config class.
+
+    This allows WarnUnsetDefaultsModel to warn about missing parameters that fall back to defaults.
+    """
+    expected_params = set(config_class.__annotations__.keys())
+    return {k: v for k, v in config_dict.items() if k in expected_params}

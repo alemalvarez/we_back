@@ -6,28 +6,10 @@ import sys
 from loguru import logger
 import torch
 import yaml # type: ignore[import]
-from models.simple_2d import DeeperCustomConfig, Deeper2DConfig, Improved2DConfig, Simple2D3LayersConfig
+from models.simple_2d import NETWORK_CONFIG_CLASSES
 from core.runner import run as run_single
 from core.logging import make_logger
-from typing import Dict, Any, Type, TypeVar
-
-T = TypeVar('T')
-
-# Mapping of model names to their config classes
-NETWORK_CONFIG_CLASSES = {
-    "DeeperCustom": DeeperCustomConfig,
-    "Deeper2D": Deeper2DConfig,
-    "Improved2D": Improved2DConfig,
-    "Simple2D3Layers": Simple2D3LayersConfig,
-}
-
-def filter_config_params(config_class: Type[T], config_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Filter config dict to only include parameters expected by the config class.
-
-    This allows WarnUnsetDefaultsModel to warn about missing parameters that fall back to defaults.
-    """
-    expected_params = set(config_class.__annotations__.keys())
-    return {k: v for k, v in config_dict.items() if k in expected_params}
+from core.schemas import filter_config_params
 
 load_dotenv()
 
