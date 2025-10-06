@@ -124,6 +124,7 @@ def run(
 
         if scheduler is not None:
             scheduler.step()
+            logger.info(f"Learning rate after annealing: {optimizer.param_groups[0]['lr']:.6f}")
 
         if patience_counter >= config.patience:
             logger.info(f"Early stopping at epoch {epoch+1}")
