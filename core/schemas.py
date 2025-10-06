@@ -1,7 +1,7 @@
 
 from dataclasses import dataclass
 import numpy as np
-from typing import Optional, List, Tuple
+from typing import Optional, Tuple
 from loguru import logger
 from typing import Literal
 from pydantic import BaseModel, model_validator
