@@ -196,6 +196,36 @@ class RunConfig(WarnUnsetDefaultsModel):
     log_to_wandb: bool = False
     wandb_init: Optional[dict] = None
 
+    @model_validator(mode="after")
+    def _print_config_summary(self):
+        logger.info("=" * 80)
+        logger.info("RunConfig Summary")
+        logger.info("=" * 80)
+        
+        model_fields = type(self).model_fields
+        for name in model_fields:
+            value = getattr(self, name)
+            is_overridden = name in self.model_fields_set
+            status = "OVERRIDDEN" if is_overridden else "DEFAULT"
+            
+            # Format nested configs nicely
+            if isinstance(value, WarnUnsetDefaultsModel):
+                logger.info(f"{name}: [{status}]")
+                self._print_nested_config(value, indent="  ")
+            else:
+                logger.info(f"{name}: {value!r} [{status}]")
+        
+        logger.info("=" * 80)
+        return self
+    
+    def _print_nested_config(self, config: WarnUnsetDefaultsModel, indent: str = ""):
+        model_fields = type(config).model_fields
+        for name in model_fields:
+            value = getattr(config, name)
+            is_overridden = name in config.model_fields_set
+            status = "OVERRIDDEN" if is_overridden else "DEFAULT"
+            logger.info(f"{indent}{name}: {value!r} [{status}]")
+
 T = TypeVar('T')
 
 def filter_config_params(config_class: Type[T], config_dict: Dict[str, Any]) -> Dict[str, Any]:
