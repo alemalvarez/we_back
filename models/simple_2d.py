@@ -12,6 +12,7 @@ class DeeperCustomConfig(NetworkConfig):
     dropout_rate: float
     paddings: List[Tuple[int, int]]
     activation: str
+    dropout_before_activation: bool
 
     @model_validator(mode="after")
     def validate_lengths(self):
@@ -59,7 +60,10 @@ class DeeperCustom(nn.Module):
                 padding=cfg.paddings[i],
             )
             bn = nn.BatchNorm2d(cfg.n_filters[i])
-            seq = nn.Sequential(conv, bn, nn.Dropout(cfg.dropout_rate), act)
+            if cfg.dropout_before_activation:
+                seq = nn.Sequential(conv, bn, nn.Dropout(cfg.dropout_rate), act)
+            else:
+                seq = nn.Sequential(conv, bn, act, nn.Dropout(cfg.dropout_rate))
             layers.append(seq)
             in_channels = cfg.n_filters[i]
 

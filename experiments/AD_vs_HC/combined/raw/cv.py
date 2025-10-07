@@ -41,6 +41,7 @@ def main() -> None:
         dropout_rate=0.5,
         paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
         activation="relu",
+        dropout_before_activation=True,
     )
     optimizer_config = OptimizerConfig(
         learning_rate=3e-2,
@@ -51,7 +52,7 @@ def main() -> None:
         cosine_annealing_eta_min=1e-6,
     )
     criterion_config = CriterionConfig(
-        pos_weight_type='fixed',
+        pos_weight_type='multiplied',
         pos_weight_value=1.0,
     )
 

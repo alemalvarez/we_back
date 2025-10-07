@@ -1,64 +1,116 @@
-from core.raw_dataset import RawDataset
-from core.model_playground import create_model_from_wandb_config
-from loguru import logger
-import wandb
-from dotenv import load_dotenv
 import os
-from core.run_sweep import run_sweep
-import torch
-import numpy as np
-import sys
+from typing import List, Literal
+
+import wandb
+
+from core.logging import make_logger
+from core.schemas import (
+    OptimizerConfig,
+    CriterionConfig,
+    RunConfig,
+    RawDatasetConfig,
+)
+from core.cv import run_cv
+from models.simple_2d import DeeperCustomConfig
+from dotenv import load_dotenv
 
 load_dotenv()
 
-WANDB_PROJECT = "AD_vs_HC_sweep"
-RANDOM_SEED = int(os.getenv("RANDOM_SEED", "42"))
-H5_FILE_PATH = os.getenv("H5_FILE_PATH", "h5test_raw_only.h5")
-logger.info(f"H5 file path: {H5_FILE_PATH}")
 
-def _parse_two_level(s: str) -> list:
-    s = s.strip()
-    if "__" in s:
-        return [[int(p) for p in g.split("_") if p] for g in s.split("__") if g]
-    return [int(p) for p in s.split("_") if p]
+def _read_subjects(path: str) -> List[str]:
+    with open(path, "r") as f:
+        return [line.strip() for line in f if line.strip()]
 
-def main():
-    # Get model type from command line argument if provided
-    model_type = None
-    if len(sys.argv) > 1:
-        model_type = sys.argv[1]
-        logger.info(f"Using model type: {model_type}")
 
-    with wandb.init(project=WANDB_PROJECT) as run:
-        config = run.config
+def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore[name-defined]
+    network_config = DeeperCustomConfig(
+        model_name="DeeperCustom",
+        n_filters=[16, 32, 64, 128],
+        kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
+        strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
+        paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
+        activation=cfg.get("activation"), # part of the sweep
+        dropout_before_activation=cfg.get("dropout_before_activation"), # part of the sweep
+        dropout_rate=float(cfg.get("dropout_rate")), # part of the sweep
+    )
 
-        torch.manual_seed(RANDOM_SEED)
-        np.random.seed(RANDOM_SEED)
+    optimizer_config = OptimizerConfig(
+        learning_rate=float(cfg.get("learning_rate")), # part of the sweep
+        weight_decay=float(cfg.get("weight_decay")),
+        use_cosine_annealing=True,
+        cosine_annealing_t_0=int(cfg.get("cosine_annealing_t_0", 5)), # part of the sweep
+        cosine_annealing_t_mult=int(cfg.get("cosine_annealing_t_mult", 1)), # part of the sweep
+        cosine_annealing_eta_min=1e-6,
+    )
 
-        # Create training dataset with optional augment parameters
-        training_dataset = RawDataset(
-            h5_file_path=H5_FILE_PATH,
-            subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/training_subjects.txt",
-            normalize=getattr(config, "normalize", "sample-channel"),  # type: ignore[attr-defined]
-            augment=bool(getattr(config, "augment", False)),  # type: ignore[attr-defined]
-            augment_prob=(
-                float(getattr(config, "augment_prob_neg", 0.5)),  # type: ignore[attr-defined] # neg, pos
-                float(getattr(config, "augment_prob_pos", 0.0))  # type: ignore[attr-defined]
-            ),
-            noise_std=float(getattr(config, "noise_std", 0.1))  # type: ignore[attr-defined]
-        )
+    criterion_config = CriterionConfig(
+        pos_weight_type="multiplied",
+        pos_weight_value=float(cfg.get("pos_weight_value")), # part of the sweep
+    )
 
-        validation_dataset = RawDataset(
-            h5_file_path=H5_FILE_PATH,
-            subjects_txt_path="experiments/AD_vs_HC/combined/raw/splits/validation_subjects.txt",
-            normalize=getattr(config, "normalize", "sample-channel"),  # type: ignore[attr-defined]
-            augment=False
-        )
+    h5_file_path = os.getenv(
+        "H5_FILE_PATH",
+        "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5",
+    )
 
-        # Create model using the universal creator
-        model = create_model_from_wandb_config(config, model_type)
+    dataset_config = RawDatasetConfig(
+        h5_file_path=h5_file_path,
+        raw_normalization="channel-subject", 
+        augment=False,
+        # augment_prob=(cfg.get("augment_prob_pos"), cfg.get("augment_prob_neg")), # part of the sweep
+        # noise_std=cfg.get("noise_std"), # part of the sweep
+    )
 
-        run_sweep(model, run, training_dataset, validation_dataset)
+    run_config = RunConfig(
+        network_config=network_config,
+        optimizer_config=optimizer_config,
+        criterion_config=criterion_config,
+        random_seed=int(os.getenv("RANDOM_SEED", 42)),
+        batch_size=int(cfg.get("batch_size", 32)), # part of the sweep
+        max_epochs=50,
+        patience=5,
+        min_delta=.001,
+        early_stopping_metric="loss",
+        dataset_config=dataset_config,
+        log_to_wandb=True,
+        wandb_init=None,
+    )
+    return run_config
+
+
+def main() -> None:
+    # Expect a W&B agent to have initialized the run; otherwise, init minimally
+    if wandb.run is None:
+        wandb.init(project=os.getenv("WANDB_PROJECT", "AD_vs_HC"))
+
+    cfg = wandb.config
+
+    train_subjects_path = os.getenv(
+        "TRAIN_SUBJECTS",
+        "experiments/AD_vs_HC/combined/raw/splits/training_subjects.txt",
+    )
+    val_subjects_path = os.getenv(
+        "VAL_SUBJECTS",
+        "experiments/AD_vs_HC/combined/raw/splits/validation_subjects.txt",
+    )
+
+    all_subjects = _read_subjects(train_subjects_path) + _read_subjects(val_subjects_path)
+    n_folds = 5
+
+    run_config = build_run_config_from_wandb(cfg)
+    
+    magic_logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)
+
+    run_cv(
+        all_subjects=all_subjects,
+        n_folds=n_folds,
+        run_config=run_config,
+        magic_logger=magic_logger,
+        min_fold_mcc=.37,
+    )
+
+    magic_logger.finish()
+
 
 if __name__ == "__main__":
     main()
