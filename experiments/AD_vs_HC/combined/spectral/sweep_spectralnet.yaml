@@ -1,7 +1,7 @@
 name: spectral_net_sweep
 method: bayes
 metric:
-  name: val/final_f1
+  name: cv/final_f1_mean
   goal: maximize
 run_cap: 30
 

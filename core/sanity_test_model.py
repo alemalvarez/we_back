@@ -3,12 +3,11 @@ import time
 from loguru import logger
 import torch
 from torch.utils.data import Dataset, DataLoader
-from core.schemas import BaseModelConfig
-import torch.nn as nn
+from core.schemas import RunConfig
 import torch.profiler
-import torch.optim as optim
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score # type: ignore
+from core.builders import build_model, build_optimizer, build_criterion
 
 def _get_device() -> torch.device:
     if torch.cuda.is_available():
@@ -21,22 +20,42 @@ def _get_device() -> torch.device:
         logger.info("Using CPU...")
         return torch.device("cpu")
 
+def _count_pos_neg(dataset: Dataset) -> tuple[int, int]:
+    pos = 0
+    neg = 0
+    for i in range(len(dataset)): # type: ignore
+        label = dataset[i][1]
+        if isinstance(label, torch.Tensor):
+            label = label.item()
+        if int(label) == 1:
+            pos += 1
+        else:
+            neg += 1
+    return pos, neg
+
 def sanity_test_model(
-    model: nn.Module,
-    config: BaseModelConfig,
-    dataset: Dataset,
+    config: RunConfig,
+    training_dataset: Dataset,
+    validation_dataset: Dataset,
     run_overfit_test: bool = False,
     overfit_test_epochs: int = 100,
     )-> None:
 
+    torch.manual_seed(config.random_seed)
+    np.random.seed(config.random_seed)
+
     device = _get_device()
-    model.to(device)
+    
+    model = build_model(config.network_config)
+    model = model.to(device)
     logger.success("Model ready")
     
-    loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True)
+    optimizer = build_optimizer(config.optimizer_config, model)
+    criterion = build_criterion(config.criterion_config, _count_pos_neg(training_dataset))
+    
+    loader = DataLoader(training_dataset, batch_size=config.batch_size, shuffle=True)
     logger.success("Loader ready")
 
-    criterion = nn.BCEWithLogitsLoss()
     one_batch = next(iter(loader))
     data, target = one_batch
     data, target = data.to(device), target.to(device).float()
@@ -54,8 +73,8 @@ def sanity_test_model(
     logger.info(f"One batch size (data + target): {total_batch_size_mb:.2f} MB")
 
     # 3. Full Dataset Memory
-    assert isinstance(dataset, Sized), "Dataset must be a Sized object"
-    num_samples = len(dataset)
+    assert isinstance(training_dataset, Sized), "Dataset must be a Sized object"
+    num_samples = len(training_dataset)
     size_of_one_sample_mb = total_batch_size_mb / config.batch_size
     estimated_dataset_size_mb = size_of_one_sample_mb * num_samples
     logger.info(f"Estimated dataset size ({num_samples} samples): {estimated_dataset_size_mb:.2f} MB")
@@ -157,7 +176,6 @@ def sanity_test_model(
 
     if run_overfit_test:
         model.train()
-        optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
         logger.info("Running an overfitting test on a single batch...")
         data_overfit, target_overfit = data, target
         for epoch in range(overfit_test_epochs):

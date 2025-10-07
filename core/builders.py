@@ -1,5 +1,4 @@
-from ast import Dict
-from typing import List, Optional, Any
+from typing import List, Optional
 from torch import nn
 import torch
 import torch.optim as optim
@@ -9,7 +8,6 @@ from models.simple_2d import Simple2D3Layers, DeeperCustom, Deeper2D, Improved2D
 from models.spectral_net import SpectralNet
 from core.spectral_dataset import SpectralDataset
 from core.raw_dataset import RawDataset
-from core.schemas import RunConfig
 
 def build_model(config: NetworkConfig) -> nn.Module: 
     name_class_map = {

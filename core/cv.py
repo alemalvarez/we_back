@@ -1,5 +1,4 @@
-
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from loguru import logger
@@ -38,7 +37,8 @@ def run_cv(
     all_subjects: List[str],
     n_folds: int,
     run_config: RunConfig,
-    magic_logger: Logger 
+    magic_logger: Logger,
+    min_fold_mcc: Optional[float] = .35,
 ) -> dict:
 
     assert len(all_subjects) >= n_folds, "Not enough subjects for the number of folds"
@@ -95,6 +95,23 @@ def run_cv(
         pretty_print_per_subject(eval_res.per_subject, title=f"Fold {fold_idx+1} per-subject")
 
         fold_metrics.append(eval_res.metrics)
+
+        # Early stopping check based on fold MCC
+        if min_fold_mcc is not None:
+            mcc_values = [v for k, v in eval_res.metrics.items() if k.endswith("/final_mcc")]
+            if mcc_values:
+                fold_mcc = float(mcc_values[0])
+                if fold_mcc < min_fold_mcc:
+                    logger.warning(
+                        f"Fold {fold_idx+1} MCC ({fold_mcc:.4f}) is below threshold ({min_fold_mcc:.4f}). "
+                        f"Stopping CV early."
+                    )
+                    magic_logger.log_metrics({
+                        "cv/early_stopped": True,
+                        "cv/early_stopped_at_fold": fold_idx + 1,
+                        "cv/early_stopped_mcc": fold_mcc,
+                    })
+                    return {"early_stopped": True, "fold": fold_idx + 1, "mcc": fold_mcc}
 
         # Clear separator between folds
         if fold_idx < n_folds - 1:

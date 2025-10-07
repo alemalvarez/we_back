@@ -14,7 +14,8 @@ from sklearn.metrics import ( # type: ignore
 
 # Training config consts (shouldn't be changed often)
 MAX_EPOCH_ALLOWED_TIME = 30 # seconds
-MAX_BATCH_ALLOWED_TIME = 2 # seconds
+MAX_AVG_BATCH_TIME = 2 # seconds
+MIN_BATCHES_FOR_AVG = 10 # minimum number of batches before checking average
 SHOULD_CLIP_GRADIENT = True
 CLIP_GRADIENT_MAX_NORM = 1.0
 COSINE_ANNEALING_T_0 = 5
@@ -72,6 +73,7 @@ def one_epoch(
     epoch_correct = 0
     epoch_total = 0
     epoch_start_time = time.time()
+    batch_durations: list[float] = []
 
     for batch_idx, (data, target) in enumerate(train_loader): # TODO: it could be interesting to get metrics 
         batch_start_time = time.time()
@@ -88,9 +90,17 @@ def one_epoch(
         optimizer.step()
 
         batch_duration = time.time() - batch_start_time
-        if batch_duration > MAX_BATCH_ALLOWED_TIME:
-            logger.warning(f"Batch {batch_idx+1} took {batch_duration:.2f} seconds (>{MAX_BATCH_ALLOWED_TIME}s). Aborting run.")
-            raise UnefficientRun("Batch took too long to process. Aborting run.")
+        batch_durations.append(batch_duration)
+        
+        # Check running average once we have enough batches
+        if len(batch_durations) >= MIN_BATCHES_FOR_AVG:
+            avg_batch_time = sum(batch_durations) / len(batch_durations)
+            if avg_batch_time > MAX_AVG_BATCH_TIME:
+                logger.warning(
+                    f"Average batch time ({avg_batch_time:.2f}s) exceeds threshold "
+                    f"({MAX_AVG_BATCH_TIME}s) after {len(batch_durations)} batches. Aborting run."
+                )
+                raise UnefficientRun("Average batch time exceeds threshold. Aborting run.")
 
         epoch_loss += loss.item()
         probabilities = torch.sigmoid(logits)
