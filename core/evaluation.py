@@ -212,6 +212,9 @@ def pretty_print_per_subject(per_subject: Optional[Dict[str, Dict[str, int]]], *
         wrong = int(counts.get("wrong", 0))
         total = max(correct + wrong, 1)
         acc = correct / total
-        logger.info(f"{subject:<24}{correct:>10}{wrong:>10}{acc:>8.2f}")
+        if acc > 0.5:
+            logger.success(f"{subject:<24}{correct:>10}{wrong:>10}{acc:>8.2f}")
+        else:
+            logger.info(f"{subject:<24}{correct:>10}{wrong:>10}{acc:>8.2f}")
 
 

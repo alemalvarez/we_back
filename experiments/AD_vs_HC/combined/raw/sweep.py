@@ -30,22 +30,22 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
         paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
         activation=cfg.get("activation"), # part of the sweep
-        dropout_before_activation=cfg.get("dropout_before_activation"), # part of the sweep
+        dropout_before_activation=False,
         dropout_rate=float(cfg.get("dropout_rate")), # part of the sweep
     )
 
     optimizer_config = OptimizerConfig(
         learning_rate=float(cfg.get("learning_rate")), # part of the sweep
-        weight_decay=float(cfg.get("weight_decay")),
+        weight_decay=0.00005,
         use_cosine_annealing=True,
-        cosine_annealing_t_0=int(cfg.get("cosine_annealing_t_0", 5)), # part of the sweep
-        cosine_annealing_t_mult=int(cfg.get("cosine_annealing_t_mult", 1)), # part of the sweep
+        cosine_annealing_t_0=7,
+        cosine_annealing_t_mult=2,
         cosine_annealing_eta_min=1e-6,
     )
 
     criterion_config = CriterionConfig(
         pos_weight_type="multiplied",
-        pos_weight_value=float(cfg.get("pos_weight_value")), # part of the sweep
+        pos_weight_value=1.0,
     )
 
     h5_file_path = os.getenv(
@@ -56,9 +56,9 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
     dataset_config = RawDatasetConfig(
         h5_file_path=h5_file_path,
         raw_normalization="channel-subject", 
-        augment=False,
-        # augment_prob=(cfg.get("augment_prob_pos"), cfg.get("augment_prob_neg")), # part of the sweep
-        # noise_std=cfg.get("noise_std"), # part of the sweep
+        augment=True,
+        augment_prob=(cfg.get("augment_prob_pos"), cfg.get("augment_prob_neg")), # part of the sweep
+        noise_std=cfg.get("noise_std"), # part of the sweep
     )
 
     run_config = RunConfig(
