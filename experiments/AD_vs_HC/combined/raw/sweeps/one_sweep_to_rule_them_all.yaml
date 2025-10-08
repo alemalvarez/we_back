@@ -1,4 +1,4 @@
-name: one_sweep_to_rule_them_all
+name: another_sweep_to_rule_them_all
 method: bayes
 metric:
   name: cv/final_mcc_mean
@@ -10,51 +10,38 @@ parameters: # this can be a little higher as we are annealing it aggresivey
     min: 1.0e-5
     max: 5.0e-3
 
-  weight_decay:
-    min: 1.0e-6
-    max: 1.0e-4
-
   dropout_rate:
     min: 0.10
     max: 0.7
 
   batch_size:
-    values: [32, 64, 128]
-
-  cosine_annealing_t_0:
-    min: 5
-    max: 10
-
-  cosine_annealing_t_mult:
-    values: [1, 2]
+    values: [64, 128]
 
   activation:
     values:
-      - relu
       - leaky_relu
-      - gelu
       - silu
-      
-  pos_weight_value:
-    min: 0.5
-    max: 1.5
 
-  # augment_prob_pos:
-  #   min: 0.01
-  #   max: 0.8
+  augment_prob_pos:
+    min: 0.01
+    max: 0.8
 
-  # augment_prob_neg:
-  #   min: 0.01
-  #   max: 0.8
+  augment_prob_neg:
+    min: 0.01
+    max: 0.8
 
-  # noise_std:
-  #   min: 0.01
-  #   max: 0.8
+  noise_std:
+    min: 0.01
+    max: 0.5
 
-  dropout_before_activation:
+  raw_normalization:
     values:
-      - true
-      - false
+      - channel-subject
+      - sample-channel
+      - sample
+      - subject
+      - channel
+      - full
 
 program: experiments.AD_vs_HC.combined.raw.sweep
 
