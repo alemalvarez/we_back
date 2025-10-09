@@ -38,22 +38,22 @@ def main() -> None:
         n_filters=[16, 32, 64, 128],
         kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
         strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
-        dropout_rate=0.5,
+        dropout_rate=0.31158910319253397,
         paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
-        activation="relu",
-        dropout_before_activation=True,
+        activation="silu",
+        dropout_before_activation=False,
     )
     optimizer_config = OptimizerConfig(
-        learning_rate=3e-2,
-        weight_decay=None,
+        learning_rate=0.004255107493153422,
+        weight_decay=9.6832252733516e-05,
         use_cosine_annealing=True,
-        cosine_annealing_t_0=5,
-        cosine_annealing_t_mult=1,
+        cosine_annealing_t_0=8,
+        cosine_annealing_t_mult=2,
         cosine_annealing_eta_min=1e-6,
     )
     criterion_config = CriterionConfig(
         pos_weight_type='multiplied',
-        pos_weight_value=1.0,
+        pos_weight_value=1.09784373282656,
     )
 
     dataset_config = RawDatasetConfig(
@@ -69,7 +69,7 @@ def main() -> None:
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         random_seed=42,
-        batch_size=32,
+        batch_size=128,
         max_epochs=50,
         patience=5,
         min_delta=0.001,
