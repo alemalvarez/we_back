@@ -3,7 +3,9 @@ from torch import nn
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset
-from core.schemas import NetworkConfig, OptimizerConfig, CriterionConfig, DatasetConfig, SpectralDatasetConfig, RawDatasetConfig
+from core.multi_dataset import MultiDataset
+from core.schemas import NetworkConfig, OptimizerConfig, CriterionConfig, DatasetConfig, SpectralDatasetConfig, RawDatasetConfig, MultiDatasetConfig
+from models.concatter import Concatter
 from models.simple_2d import Simple2D3Layers, DeeperCustom, Deeper2D, Improved2D
 from models.spectral_net import SpectralNet
 from core.spectral_dataset import SpectralDataset
@@ -16,6 +18,7 @@ def build_model(config: NetworkConfig) -> nn.Module:
         "Improved2D": Improved2D,
         "Simple2D3Layers": Simple2D3Layers,
         "SpectralNet": SpectralNet,
+        "Concatter": Concatter,
     }
     return name_class_map[config.model_name](config)
 
@@ -43,6 +46,14 @@ def build_dataset(config: DatasetConfig, subjects_path: Optional[str] = None, su
         return SpectralDataset(
             config.h5_file_path,
             subjects_path,
+            config.spectral_normalization,
+            subjects_list
+        )
+    elif isinstance(config, MultiDatasetConfig):
+        return MultiDataset(
+            config.h5_file_path,
+            subjects_path,
+            config.raw_normalization,
             config.spectral_normalization,
             subjects_list
         )

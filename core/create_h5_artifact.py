@@ -492,7 +492,7 @@ if __name__ == "__main__":
         output_path="h5test_raw_only_downsampled.h5",
         include_raw=True,
         include_psd=False,
-        include_features=False,
+        include_features=True,
         dividing_factor=1,
         downsampling_freq=200
 

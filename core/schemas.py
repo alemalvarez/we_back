@@ -181,6 +181,11 @@ class RawDatasetConfig(DatasetConfig):
     augment_prob: Tuple[float, float] = (0.5, 0.0)
     noise_std: float = 0.1
 
+class MultiDatasetConfig(DatasetConfig):
+    dataset_type: Literal['multi'] = 'multi'
+    raw_normalization: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full'] = 'sample-channel'
+    spectral_normalization: Literal['min-max', 'standard', 'none'] = 'none'
+
 
 class RunConfig(WarnUnsetDefaultsModel):
     network_config: NetworkConfig

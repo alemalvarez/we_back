@@ -49,6 +49,7 @@ class RawDataset(Dataset):
             for subj_key in self.subject_ids:
                 subject = f['subjects'][subj_key]
                 n_segments = subject.attrs['n_segments']
+                
                 raw_segments = subject['raw_segments'][()]
 
                 subject_data[subj_key] = {

@@ -12,6 +12,18 @@ from sklearn.metrics import ( # type: ignore
     cohen_kappa_score,
 )
 
+def _unpack_batch(batch: tuple, device: torch.device) -> tuple[torch.Tensor | tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
+    """Unpack batch and move to device. Handles both (x, y) and ((x_raw, x_spectral), y) formats."""
+    data_or_tuple, target = batch  # type: ignore
+    
+    if isinstance(data_or_tuple, (tuple, list)):
+        data: torch.Tensor | tuple[torch.Tensor, torch.Tensor] = tuple(d.to(device) for d in data_or_tuple)
+    else:
+        data = data_or_tuple.to(device)
+    
+    target = target.to(device).float()
+    return data, target
+
 # Training config consts (shouldn't be changed often)
 MAX_EPOCH_ALLOWED_TIME = 30 # seconds
 MAX_AVG_BATCH_TIME = 2 # seconds
@@ -75,10 +87,10 @@ def one_epoch(
     epoch_start_time = time.time()
     batch_durations: list[float] = []
 
-    for batch_idx, (data, target) in enumerate(train_loader): # TODO: it could be interesting to get metrics 
+    for batch_idx, batch in enumerate(train_loader): # TODO: it could be interesting to get metrics 
         batch_start_time = time.time()
         # on a batch level. maybe later.
-        data, target = data.to(device), target.to(device).float()
+        data, target = _unpack_batch(batch, device)
         logits = model(data).squeeze(1) # well, i don't usually put the sigmoid on the model.
         loss = criterion(logits, target) # im kind of expecting that this will be BCEWithLogitsLoss. i 
         # should probably check what happens if it's not.
@@ -121,8 +133,8 @@ def one_epoch(
     y_pred_list: list[np.ndarray] = []
 
     with torch.no_grad():
-        for data, target in validation_loader:
-            data, target = data.to(device), target.to(device).float()
+        for batch in validation_loader:
+            data, target = _unpack_batch(batch, device)
             logits = model(data).squeeze(1)
 
             loss = criterion(logits, target)

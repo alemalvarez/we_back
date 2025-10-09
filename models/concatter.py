@@ -2,38 +2,49 @@ import torch
 from torch import nn
 from typing import List, Tuple, Optional
 
-class DeeperCustomConcat(nn.Module):
+from core.schemas import NetworkConfig
+
+class ConcatterConfig(NetworkConfig):
+    model_name: str = "Concatter"
+    n_filters: List[int]
+    kernel_sizes: List[Tuple[int, int]]
+    strides: List[Tuple[int, int]]
+    dropout_rate: float
+    paddings: List[Tuple[int, int]]
+    activation: str
+    n_spectral_features: int
+
+class Concatter(nn.Module):
     """
-    2D CNN for EEG data classification with support for concatenating
-    additional spectral features before the final classifier.
-    Expects input as a tuple: (raw_tensor, spectral_features)
-    - raw_tensor: shape (batch, channels, time) or (batch, 1, channels, time)
-    - spectral_features: shape (batch, n_spectral_features)
+    This network consists of two branches plus a concattenation head.
+    Raw branch:
+        - 4 conv layers in the style of deeper custom.
+        - each layer: (conv, bn, act, dropout)
+    Spectral branch:
+        - Right now, literally nothing.
+    Concattenation head:
+        - we pool the output of the cnns
+        - we concatenate it to the spectral features
+        - single perceptron for output
     """
 
     def __init__(
         self,
-        n_filters: List[int],
-        kernel_sizes: List[Tuple[int, int]],
-        strides: List[Tuple[int, int]],
-        dropout_rate: float,
-        paddings: List[Tuple[int, int]],
-        activation: str,
-        n_spectral_features: int,
+        cfg: ConcatterConfig,
     ):
         super().__init__()
 
         # Select activation
-        if activation == "relu":
+        if cfg.activation == "relu":
             act: nn.Module = nn.ReLU(inplace=True)
-        elif activation == "leaky_relu":
+        elif cfg.activation == "leaky_relu":
             act = nn.LeakyReLU(inplace=True)
-        elif activation == "gelu":
+        elif cfg.activation == "gelu":
             act = nn.GELU()
-        elif activation == "silu":
+        elif cfg.activation == "silu":
             act = nn.SiLU()
         else:
-            raise ValueError(f"Unsupported activation: {activation}")
+            raise ValueError(f"Unsupported activation: {cfg.activation}")
 
         self.activation = act
 
@@ -43,37 +54,36 @@ class DeeperCustomConcat(nn.Module):
         for i in range(4):
             conv = nn.Conv2d(
                 in_channels=in_channels,
-                out_channels=n_filters[i],
-                kernel_size=kernel_sizes[i],
-                stride=strides[i],
-                padding=paddings[i],
+                out_channels=cfg.n_filters[i],
+                kernel_size=cfg.kernel_sizes[i],
+                stride=cfg.strides[i],
+                padding=cfg.paddings[i],
             )
-            bn = nn.BatchNorm2d(n_filters[i])
-            seq = nn.Sequential(conv, bn, nn.Dropout(dropout_rate), act)
+            bn = nn.BatchNorm2d(cfg.n_filters[i])
+            seq = nn.Sequential(conv, bn, nn.Dropout(cfg.dropout_rate), act)
             layers.append(seq)
-            in_channels = n_filters[i]
+            in_channels = cfg.n_filters[i]
 
         self.layers = nn.ModuleList(layers)
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
 
         # The input to the classifier is conv_out + n_spectral_features
-        self.classifier = nn.Linear(n_filters[3] + n_spectral_features, 1)
+        self.classifier = nn.Linear(cfg.n_filters[3] + cfg.n_spectral_features, 1)
 
     def forward(
         self,
-        x: torch.Tensor,
-        spectral_features: Optional[torch.Tensor] = None
+        x: Tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         """
-        x: raw input, shape (batch, channels, time) or (batch, 1, channels, time)
+        x: Tuple[torch.Tensor, torch.Tensor], shape (batch, channels, time) or (batch, 1, channels, time)
         spectral_features: shape (batch, n_spectral_features)
         """
-        if x.dim() == 3:
-            x = x.unsqueeze(1)
+        x_raw, x_spectral = x
+        if x_raw.dim() == 3:
+            x_raw = x_raw.unsqueeze(1)
         for layer in self.layers:
-            x = layer(x)
-        x = self.global_avg_pool(x)
-        x = x.flatten(1)
-        if spectral_features is not None:
-            x = torch.cat([x, spectral_features], dim=1)
-        return self.classifier(x)
+            x_raw = layer(x_raw)
+        x_raw = self.global_avg_pool(x_raw)
+        x_raw = x_raw.flatten(1)
+        x_combined = torch.cat([x_raw, x_spectral], dim=1)
+        return self.classifier(x_combined)

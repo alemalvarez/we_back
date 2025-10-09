@@ -24,7 +24,8 @@ def _count_pos_neg(dataset: Dataset) -> tuple[int, int]:
     pos = 0
     neg = 0
     for i in range(len(dataset)): # type: ignore
-        label = dataset[i][1]
+        sample = dataset[i]
+        label = sample[-1]
         if isinstance(label, torch.Tensor):
             label = label.item()
         if int(label) == 1:
@@ -33,10 +34,21 @@ def _count_pos_neg(dataset: Dataset) -> tuple[int, int]:
             neg += 1
     return pos, neg
 
+def _unpack_batch(batch: tuple, device: torch.device) -> tuple[torch.Tensor | tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
+    """Unpack batch and move to device. Handles both (x, y) and ((x_raw, x_spectral), y) formats."""
+    data_or_tuple, target = batch  # type: ignore
+    
+    if isinstance(data_or_tuple, (tuple, list)):
+        data: torch.Tensor | tuple[torch.Tensor, torch.Tensor] = tuple(d.to(device) for d in data_or_tuple)
+    else:
+        data = data_or_tuple.to(device)
+    
+    target = target.to(device).float()
+    return data, target
+
 def sanity_test_model(
     config: RunConfig,
     training_dataset: Dataset,
-    validation_dataset: Dataset,
     run_overfit_test: bool = False,
     overfit_test_epochs: int = 100,
     )-> None:
@@ -57,8 +69,7 @@ def sanity_test_model(
     logger.success("Loader ready")
 
     one_batch = next(iter(loader))
-    data, target = one_batch
-    data, target = data.to(device), target.to(device).float()
+    data, target = _unpack_batch(one_batch, device)
 
     logger.info("--- Memory Estimations ---")
     # 1. Model Memory
@@ -67,7 +78,10 @@ def sanity_test_model(
     logger.info(f"Model size (parameters): {model_size_mb:.2f} MB")
 
     # 2. Batch Memory
-    batch_data_size_mb = data.nelement() * data.element_size() / (1024**2)
+    if isinstance(data, tuple):
+        batch_data_size_mb = sum(d.nelement() * d.element_size() for d in data) / (1024**2)
+    else:
+        batch_data_size_mb = data.nelement() * data.element_size() / (1024**2)
     batch_target_size_mb = target.nelement() * target.element_size() / (1024**2)
     total_batch_size_mb = batch_data_size_mb + batch_target_size_mb
     logger.info(f"One batch size (data + target): {total_batch_size_mb:.2f} MB")
@@ -105,8 +119,8 @@ def sanity_test_model(
     val_total = 0
 
     with torch.no_grad():
-        for data, target in loader:
-            data, target = data.to(device), target.to(device).float()
+        for batch in loader:
+            data, target = _unpack_batch(batch, device)
             outputs = model(data).squeeze(1)
             loss = criterion(outputs, target)
             val_loss += loss.item()
