@@ -15,6 +15,8 @@ class ConcatterConfig(NetworkConfig):
     activation: str
     n_spectral_features: int
     head_hidden_sizes: List[int]
+    raw_weight: float
+    spectral_weight: float
 
 class Concatter(nn.Module):
     """
@@ -69,7 +71,10 @@ class Concatter(nn.Module):
         self.layers = nn.ModuleList(layers)
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
         self.spectral_dropout = nn.Dropout(cfg.spectral_dropout_rate)
-
+        
+        self.raw_weight = nn.Parameter(torch.tensor(cfg.raw_weight))
+        self.spectral_weight = nn.Parameter(torch.tensor(cfg.spectral_weight))
+        
         # Build concatenation head with hidden layers
         head_layers: List[nn.Module] = []
         in_features = cfg.n_filters[3] + cfg.n_spectral_features
@@ -96,6 +101,11 @@ class Concatter(nn.Module):
             x_raw = layer(x_raw)
         x_raw = self.global_avg_pool(x_raw)
         x_raw = x_raw.flatten(1)
+
+
         x_spectral = self.spectral_dropout(x_spectral)
-        x_combined = torch.cat([x_raw, x_spectral], dim=1)
+        x_combined = torch.cat([
+            x_raw * self.raw_weight, 
+            x_spectral * self.spectral_weight]
+        , dim=1)
         return self.classifier(x_combined)
