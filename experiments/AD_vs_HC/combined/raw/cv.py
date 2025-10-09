@@ -59,7 +59,7 @@ def main() -> None:
     dataset_config = RawDatasetConfig(
         h5_file_path=h5_file_path,
         raw_normalization='channel-subject',
-        augment=True,
+        augment=False,
         augment_prob=(0.5, 0.5),
         noise_std=0.1,
     )
