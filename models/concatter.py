@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 from core.schemas import NetworkConfig
 

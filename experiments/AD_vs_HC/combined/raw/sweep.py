@@ -1,5 +1,5 @@
 import os
-from typing import List, Literal
+from typing import List
 
 import wandb
 

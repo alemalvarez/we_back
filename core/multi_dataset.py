@@ -1,4 +1,4 @@
-from typing import List, Literal, Tuple, Optional
+from typing import List, Literal, Optional
 import h5py  # type: ignore
 from loguru import logger
 from torch.utils.data import Dataset

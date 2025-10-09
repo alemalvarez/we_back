@@ -28,6 +28,17 @@ class EvaluationResult:
     best_threshold: float
     per_subject: Optional[Dict[str, Dict[str, int]]] = None
 
+def _unpack_batch(batch: tuple, device: torch.device) -> tuple[torch.Tensor | tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
+    """Unpack batch and move to device. Handles both (x, y) and ((x_raw, x_spectral), y) formats."""
+    data_or_tuple, target = batch  # type: ignore
+    
+    if isinstance(data_or_tuple, (tuple, list)):
+        data: torch.Tensor | tuple[torch.Tensor, torch.Tensor] = tuple(d.to(device) for d in data_or_tuple)
+    else:
+        data = data_or_tuple.to(device)
+    
+    target = target.to(device).float()
+    return data, target
 
 def evaluate_dataset(
     *,
@@ -71,9 +82,8 @@ def evaluate_dataset(
     total_loss = 0.0
 
     with torch.no_grad():
-        for batch_idx, (data, target) in enumerate(loader):
-            data = data.to(device)
-            target = target.to(device).float()
+        for batch_idx, batch in enumerate(loader):
+            data, target = _unpack_batch(batch, device)
 
             logits = model(data).squeeze(1)
             outputs = torch.sigmoid(logits)
