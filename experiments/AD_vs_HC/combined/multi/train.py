@@ -32,6 +32,7 @@ if __name__ == "__main__":
         paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
         activation="silu",
         n_spectral_features=16,
+        spectral_dropout_rate=0.5,
     )
 
     optimizer_config = OptimizerConfig(

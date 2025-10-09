@@ -10,6 +10,7 @@ class ConcatterConfig(NetworkConfig):
     kernel_sizes: List[Tuple[int, int]]
     strides: List[Tuple[int, int]]
     dropout_rate: float
+    spectral_dropout_rate: float
     paddings: List[Tuple[int, int]]
     activation: str
     n_spectral_features: int
@@ -66,6 +67,7 @@ class Concatter(nn.Module):
 
         self.layers = nn.ModuleList(layers)
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.spectral_dropout = nn.Dropout(cfg.spectral_dropout_rate)
 
         # The input to the classifier is conv_out + n_spectral_features
         self.classifier = nn.Linear(cfg.n_filters[3] + cfg.n_spectral_features, 1)
@@ -85,5 +87,6 @@ class Concatter(nn.Module):
             x_raw = layer(x_raw)
         x_raw = self.global_avg_pool(x_raw)
         x_raw = x_raw.flatten(1)
+        x_spectral = self.spectral_dropout(x_spectral)
         x_combined = torch.cat([x_raw, x_spectral], dim=1)
         return self.classifier(x_combined)
