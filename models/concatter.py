@@ -14,6 +14,7 @@ class ConcatterConfig(NetworkConfig):
     paddings: List[Tuple[int, int]]
     activation: str
     n_spectral_features: int
+    head_hidden_sizes: List[int]
 
 class Concatter(nn.Module):
     """
@@ -22,11 +23,11 @@ class Concatter(nn.Module):
         - 4 conv layers in the style of deeper custom.
         - each layer: (conv, bn, act, dropout)
     Spectral branch:
-        - Right now, literally nothing.
+        - Dropout layer for regularization.
     Concattenation head:
         - we pool the output of the cnns
         - we concatenate it to the spectral features
-        - single perceptron for output
+        - multi-layer perceptron with dropout for output
     """
 
     def __init__(
@@ -69,8 +70,16 @@ class Concatter(nn.Module):
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
         self.spectral_dropout = nn.Dropout(cfg.spectral_dropout_rate)
 
-        # The input to the classifier is conv_out + n_spectral_features
-        self.classifier = nn.Linear(cfg.n_filters[3] + cfg.n_spectral_features, 1)
+        # Build concatenation head with hidden layers
+        head_layers: List[nn.Module] = []
+        in_features = cfg.n_filters[3] + cfg.n_spectral_features
+        for hidden_size in cfg.head_hidden_sizes:
+            head_layers.append(nn.Linear(in_features, hidden_size))
+            head_layers.append(nn.Dropout(cfg.dropout_rate))
+            head_layers.append(act)
+            in_features = hidden_size
+        head_layers.append(nn.Linear(in_features, 1))
+        self.classifier = nn.Sequential(*head_layers)
 
     def forward(
         self,
