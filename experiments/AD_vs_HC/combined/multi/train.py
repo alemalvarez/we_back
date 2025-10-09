@@ -33,6 +33,7 @@ if __name__ == "__main__":
         activation="silu",
         n_spectral_features=16,
         spectral_dropout_rate=0.5,
+        head_hidden_sizes=[16, 8],
     )
 
     optimizer_config = OptimizerConfig(
