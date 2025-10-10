@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from typing import List, Tuple
+from typing import List, Tuple, Literal
 
 from core.schemas import NetworkConfig
 
@@ -123,6 +123,7 @@ class GatedConcatterConfig(NetworkConfig):
     n_spectral_features: int
     head_hidden_sizes: List[int]
     concat_dropout_rate: float
+    gate_in_features: Literal["raw", "spectral", "both"]
 
 class GatedConcatter(nn.Module):
     """
@@ -178,9 +179,15 @@ class GatedConcatter(nn.Module):
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
         self.spectral_dropout = nn.Dropout(cfg.spectral_dropout_rate)
 
-        gate_in_features = cfg.n_filters[3] # Gating based on raw features
-        # or cfg.n_spectral_features (based on spectral)
-        # or cfg.n_filters[3] + cfg.n_spectral_features (based on both)
+        if cfg.gate_in_features == "raw":
+            gate_in_features = cfg.n_filters[3]
+        elif cfg.gate_in_features == "spectral":
+            gate_in_features = cfg.n_spectral_features
+        elif cfg.gate_in_features == "both":
+            gate_in_features = cfg.n_filters[3] + cfg.n_spectral_features
+        else:
+            raise ValueError(f"Unsupported gate_in_features: {cfg.gate_in_features}")
+            
         self.alpha_perceptron = nn.Sequential(
             nn.Linear(gate_in_features, 1),
             nn.Sigmoid()

@@ -35,6 +35,7 @@ if __name__ == "__main__":
         spectral_dropout_rate=0.5,
         head_hidden_sizes=[128, 32],
         concat_dropout_rate=0.31158910319253397,
+        gate_in_features="raw",
     )
 
     optimizer_config = OptimizerConfig(
