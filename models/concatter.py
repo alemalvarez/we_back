@@ -179,14 +179,15 @@ class GatedConcatter(nn.Module):
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
         self.spectral_dropout = nn.Dropout(cfg.spectral_dropout_rate)
 
-        if cfg.gate_in_features == "raw":
-            gate_in_features = cfg.n_filters[3]
-        elif cfg.gate_in_features == "spectral":
+        self.gate_in_features = cfg.gate_in_features
+        if self.gate_in_features == "raw":
+            gate_in_features = cfg.n_filters[3] 
+        elif self.gate_in_features == "spectral":
             gate_in_features = cfg.n_spectral_features
-        elif cfg.gate_in_features == "both":
+        elif self.gate_in_features == "both":
             gate_in_features = cfg.n_filters[3] + cfg.n_spectral_features
         else:
-            raise ValueError(f"Unsupported gate_in_features: {cfg.gate_in_features}")
+            raise ValueError(f"Unsupported gate_in_features: {self.gate_in_features}")
             
         self.alpha_perceptron = nn.Sequential(
             nn.Linear(gate_in_features, 1),
@@ -221,7 +222,16 @@ class GatedConcatter(nn.Module):
         x_raw = x_raw.flatten(1)
 
         x_spectral = self.spectral_dropout(x_spectral)
-        gate_value = self.alpha_perceptron(x_raw)
+
+        if self.gate_in_features == "raw":
+            gate_value = self.alpha_perceptron(x_raw)
+        elif self.gate_in_features == "spectral":
+            gate_value = self.alpha_perceptron(x_spectral)
+        elif self.gate_in_features == "both":
+            gate_value = self.alpha_perceptron(torch.cat([x_raw, x_spectral], dim=1))
+        else:
+            raise ValueError(f"Unsupported gate_in_features: {self.gate_in_features}")
+        
         x_combined = torch.cat([
             x_raw * gate_value,
             x_spectral * (1 - gate_value)
