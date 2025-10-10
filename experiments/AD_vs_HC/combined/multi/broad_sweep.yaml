@@ -21,9 +21,9 @@ parameters:
 
   head_hidden_sizes:
     values:
-      - 128_32
-      - 64_16
-      - 32_8
+      - "128_32"
+      - "64_16"
+      - "32_8"
 
   # Common training hparams used in build_run_config_from_wandb
   learning_rate:
