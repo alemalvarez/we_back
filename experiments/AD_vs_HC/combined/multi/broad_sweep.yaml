@@ -1,0 +1,73 @@
+name: multi-broad-arch-probe
+method: random
+metric:
+  name: val/final_f1
+  goal: maximize
+run_cap: 50
+
+parameters:
+  # Architecture selector expected by sweep.py
+  arch:
+    values:
+      # Concatter: alpha choices
+      - concatter_0.25
+      - concatter_0.5
+      - concatter_0.75
+      - concatter_0.9
+      # GatedConcatter: gate input feature source
+      - gated_raw
+      - gated_spectral
+      - gated_both
+
+  head_hidden_sizes:
+    values:
+      - 128_32
+      - 64_16
+      - 32_8
+
+  # Common training hparams used in build_run_config_from_wandb
+  learning_rate:
+    values: [1.0e-4, 3.0e-4, 1.0e-3, 3.0e-3]
+  batch_size:
+    values: [32, 64, 128]
+
+  raw_dropout_rate:
+    values: [0.25, 0.50, 0.75]
+  spectral_dropout_rate:
+    values: [0.25, 0.50, 0.75]
+  concat_dropout_rate:
+    values: [0.25, 0.50, 0.75]
+
+  pos_weight_value:
+    values: [0.7, 0.8, 0.9]
+
+  # Run control
+  max_epochs:
+    value: 50
+  patience:
+    value: 10
+  min_delta:
+    value: 0.001
+  random_seed:
+    value: 42
+
+  # Dataset normalization (allowed literals in your code)
+  raw_normalization:
+    values:
+      - channel-subject
+      - sample-channel
+      - sample
+      - subject
+      - channel
+      - full
+
+program: experiments.AD_vs_HC.combined.multi.sweep.py
+
+command:
+  - ${env}
+  - uv
+  - run
+  - -m
+  - ${program}
+  - ${args}
+
