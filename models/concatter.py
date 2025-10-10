@@ -65,7 +65,7 @@ class Concatter(nn.Module):
                 padding=cfg.paddings[i],
             )
             bn = nn.BatchNorm2d(cfg.n_filters[i])
-            seq = nn.Sequential(conv, bn, nn.Dropout(cfg.raw_dropout_rate), act)
+            seq = nn.Sequential(conv, bn, act, nn.Dropout(cfg.raw_dropout_rate))
             layers.append(seq)
             in_channels = cfg.n_filters[i]
 
@@ -80,8 +80,8 @@ class Concatter(nn.Module):
         in_features = cfg.n_filters[3] + cfg.n_spectral_features
         for hidden_size in cfg.head_hidden_sizes:
             head_layers.append(nn.Linear(in_features, hidden_size))
-            head_layers.append(nn.Dropout(cfg.concat_dropout_rate))
             head_layers.append(act)
+            head_layers.append(nn.Dropout(cfg.concat_dropout_rate))
             in_features = hidden_size
         head_layers.append(nn.Linear(in_features, 1))
         self.classifier = nn.Sequential(*head_layers)
@@ -170,7 +170,7 @@ class GatedConcatter(nn.Module):
                 padding=cfg.paddings[i],
             )
             bn = nn.BatchNorm2d(cfg.n_filters[i])
-            seq = nn.Sequential(conv, bn, nn.Dropout(cfg.raw_dropout_rate), act)
+            seq = nn.Sequential(conv, bn, act, nn.Dropout(cfg.raw_dropout_rate))
             layers.append(seq)
             in_channels = cfg.n_filters[i]
 
@@ -191,8 +191,8 @@ class GatedConcatter(nn.Module):
         in_features = cfg.n_filters[3] + cfg.n_spectral_features
         for hidden_size in cfg.head_hidden_sizes:
             head_layers.append(nn.Linear(in_features, hidden_size))
-            head_layers.append(nn.Dropout(cfg.concat_dropout_rate))
             head_layers.append(act)
+            head_layers.append(nn.Dropout(cfg.concat_dropout_rate))
             in_features = hidden_size
         head_layers.append(nn.Linear(in_features, 1))
         self.classifier = nn.Sequential(*head_layers)
