@@ -9,7 +9,7 @@ from core.schemas import (
 from core.cv import build_dataset
 from core.sanity_test_model import sanity_test_model
 
-from models.concatter import ConcatterConfig
+from models.concatter import GatedConcatterConfig
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -23,20 +23,23 @@ def main() -> None:
     splits_dir = "experiments/AD_vs_HC/combined/raw/splits"
     train_subjects_path = os.path.join(splits_dir, "training_subjects.txt")
 
-    model_config = ConcatterConfig(
-        model_name="Concatter",
+    model_config = GatedConcatterConfig(
+        model_name="GatedConcatter",
         n_filters=[16, 32, 64, 128],
         kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
         strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
-        dropout_rate=0.31158910319253397,
+        raw_dropout_rate=0.31158910319253397,
         paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
         activation="silu",
         n_spectral_features=16,
+        head_hidden_sizes=[128, 32],
+        concat_dropout_rate=0.31158910319253397,
+        spectral_dropout_rate=0.5,
     )
     optimizer_config = OptimizerConfig(
         learning_rate=0.004255107493153422,
         weight_decay=9.6832252733516e-05,
-        use_cosine_annealing=True,
+        use_cosine_annealing=False,
         cosine_annealing_t_0=8,
         cosine_annealing_t_mult=2,
         cosine_annealing_eta_min=1e-6,
@@ -73,7 +76,7 @@ def main() -> None:
         validation=False
     )
 
-    sanity_test_model(run_config, training_dataset, run_overfit_test=True, overfit_test_epochs=100)
+    sanity_test_model(run_config, training_dataset, run_overfit_test=True, overfit_test_epochs=50)
 
 
 if __name__ == "__main__":

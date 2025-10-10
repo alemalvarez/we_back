@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset
 from core.multi_dataset import MultiDataset
 from core.schemas import NetworkConfig, OptimizerConfig, CriterionConfig, DatasetConfig, SpectralDatasetConfig, RawDatasetConfig, MultiDatasetConfig
-from models.concatter import Concatter
+from models.concatter import Concatter, GatedConcatter
 from models.simple_2d import Simple2D3Layers, DeeperCustom, Deeper2D, Improved2D
 from models.spectral_net import SpectralNet
 from core.spectral_dataset import SpectralDataset
@@ -19,6 +19,7 @@ def build_model(config: NetworkConfig) -> nn.Module:
         "Simple2D3Layers": Simple2D3Layers,
         "SpectralNet": SpectralNet,
         "Concatter": Concatter,
+        "GatedConcatter": GatedConcatter,
     }
     return name_class_map[config.model_name](config)
 

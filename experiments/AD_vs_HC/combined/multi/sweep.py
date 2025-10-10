@@ -8,10 +8,10 @@ from core.schemas import (
     OptimizerConfig,
     CriterionConfig,
     RunConfig,
-    SpectralDatasetConfig,
+    MultiDatasetConfig,
 )
 from core.cv import run_cv
-from models.spectral_net import SpectralNetConfig
+from models.concatter import ConcatterConfig
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,12 +23,19 @@ def _read_subjects(path: str) -> List[str]:
 
 
 def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore[name-defined]
-    network_config = SpectralNetConfig(
-        model_name="SpectralNet",
-        input_size=int(cfg.get("input_size", 16)),
-        hidden_1_size=int(cfg.get("hidden_1_size", 16)),
-        hidden_2_size=int(cfg.get("hidden_2_size", 16)),
+    network_config = ConcatterConfig(
+        model_name="Concatter",
+        n_filters=[16, 32, 64, 128],
+        kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
+        strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
         dropout_rate=float(cfg.get("dropout_rate", 0.25)),
+        paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
+        activation="silu",
+        n_spectral_features=16,
+        spectral_dropout_rate=0.5,
+        head_hidden_sizes=[128, 32],
+        raw_weight=0.6,
+        spectral_weight=0.4,
     )
 
     optimizer_config = OptimizerConfig(
@@ -40,24 +47,17 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         cosine_annealing_eta_min=float(cfg.get("cosine_annealing_eta_min", 1e-6)),
     )
 
-    pw_type_str = str(cfg.get("pos_weight_type", "fixed"))
-    pw_type_lit: Literal['fixed','multiplied'] = pw_type_str if pw_type_str in ("fixed","multiplied") else "fixed"  # type: ignore[assignment]
     criterion_config = CriterionConfig(
-        pos_weight_type=pw_type_lit,
+        pos_weight_type="multiplied",
         pos_weight_value=float(cfg.get("pos_weight_value", 1.0)),
     )
-
-    esm_str = str(cfg.get("early_stopping_metric", "mcc"))
-    esm_lit: Literal['loss','f1','mcc','kappa'] = esm_str if esm_str in ("loss","f1","mcc","kappa") else "loss"  # type: ignore[assignment]
-
-    norm_str = str(cfg.get("normalization", "standard"))
-    norm_lit: Literal['min-max','standard','none'] = norm_str if norm_str in ("min-max","standard","none") else "standard"  # type: ignore[assignment]
-
 
     h5_file_path = os.getenv(
         "H5_FILE_PATH",
         "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5",
     )
+
+    raw_norm_lit: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full'] = cfg.get("raw_normalization", "channel-subject")  # type: ignore
 
     run_config = RunConfig(
         network_config=network_config,
@@ -68,10 +68,11 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         max_epochs=int(cfg.get("max_epochs", 50)),
         patience=int(cfg.get("patience", 15)),
         min_delta=float(cfg.get("min_delta", 0.001)),
-        early_stopping_metric=esm_lit,
-        dataset_config=SpectralDatasetConfig(
+        early_stopping_metric="loss",
+        dataset_config=MultiDatasetConfig(
             h5_file_path=h5_file_path,
-            spectral_normalization=norm_lit,
+            spectral_normalization="standard",
+            raw_normalization=raw_norm_lit,
         ),
         log_to_wandb=True,
         wandb_init=None,
@@ -88,11 +89,11 @@ def main() -> None:
 
     train_subjects_path = os.getenv(
         "TRAIN_SUBJECTS",
-        "experiments/AD_vs_HC/combined/spectral/splits/training_subjects.txt",
+        "experiments/AD_vs_HC/combined/multi/splits/training_subjects.txt",
     )
     val_subjects_path = os.getenv(
         "VAL_SUBJECTS",
-        "experiments/AD_vs_HC/combined/spectral/splits/validation_subjects.txt",
+        "experiments/AD_vs_HC/combined/multi/splits/validation_subjects.txt",
     )
 
     all_subjects = _read_subjects(train_subjects_path) + _read_subjects(val_subjects_path)
@@ -107,7 +108,7 @@ def main() -> None:
         n_folds=n_folds,
         run_config=run_config,
         magic_logger=magic_logger,
-        min_fold_mcc=.35,
+        min_fold_mcc=.37,
     )
 
     magic_logger.finish()
