@@ -61,7 +61,7 @@ parameters:
       - channel
       - full
 
-program: experiments.AD_vs_HC.combined.multi.sweep.py
+program: experiments.AD_vs_HC.combined.multi.sweep
 
 command:
   - ${env}
