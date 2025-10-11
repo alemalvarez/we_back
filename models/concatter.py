@@ -4,6 +4,99 @@ from typing import List, Tuple, Literal
 
 from core.schemas import NetworkConfig
 
+
+class SimpleConcatterConfig(NetworkConfig):
+    model_name: str = "SimpleConcatter"
+    n_filters: List[int]
+    kernel_sizes: List[Tuple[int, int]]
+    strides: List[Tuple[int, int]]
+    raw_dropout_rate: float
+    spectral_dropout_rate: float
+    paddings: List[Tuple[int, int]]
+    activation: str
+    n_spectral_features: int
+    head_hidden_sizes: List[int]
+    concat_dropout_rate: float
+
+
+class SimpleConcatter(nn.Module):
+    def __init__(
+        self,
+        cfg: SimpleConcatterConfig,
+    ):
+        super().__init__()
+
+        if cfg.activation == "relu":
+            act: nn.Module = nn.ReLU(inplace=True)
+        elif cfg.activation == "leaky_relu":
+            act = nn.LeakyReLU(inplace=True)
+        elif cfg.activation == "gelu":
+            act = nn.GELU()
+        elif cfg.activation == "silu":
+            act = nn.SiLU()
+        else:
+            raise ValueError(f"Unsupported activation: {cfg.activation}")
+
+        self.activation = act
+
+        # Build convolutional layers
+        layers = []
+        in_channels = 1
+        for i in range(4):
+            conv = nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=cfg.n_filters[i],
+                kernel_size=cfg.kernel_sizes[i],
+                stride=cfg.strides[i],
+                padding=cfg.paddings[i],
+            )
+            bn = nn.BatchNorm2d(cfg.n_filters[i])
+            seq = nn.Sequential(conv, bn, act, nn.Dropout(cfg.raw_dropout_rate))
+            layers.append(seq)
+            in_channels = cfg.n_filters[i]
+
+        self.layers = nn.Sequential(*layers)
+        self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
+        
+        # Normalization before concatenation
+        self.raw_norm = nn.BatchNorm1d(cfg.n_filters[3])
+        self.spectral_norm = nn.BatchNorm1d(cfg.n_spectral_features)
+        self.spectral_dropout = nn.Dropout(cfg.spectral_dropout_rate)
+
+        # Build concatenation head with hidden layers
+        head_layers: List[nn.Module] = []
+        in_features = cfg.n_filters[3] + cfg.n_spectral_features
+        for hidden_size in cfg.head_hidden_sizes:
+            head_layers.append(nn.Linear(in_features, hidden_size))
+            head_layers.append(act)
+            head_layers.append(nn.Dropout(cfg.concat_dropout_rate))
+            in_features = hidden_size
+        head_layers.append(nn.Linear(in_features, 1))
+        self.classifier = nn.Sequential(*head_layers)
+        
+    def forward(
+        self,
+        x: Tuple[torch.Tensor, torch.Tensor],
+    ) -> torch.Tensor:
+        """
+        x: Tuple[torch.Tensor, torch.Tensor], shape (batch, channels, time) or (batch, 1, channels, time)
+        spectral_features: shape (batch, n_spectral_features)
+        """
+        x_raw, x_spectral = x
+        if x_raw.dim() == 3:
+            x_raw = x_raw.unsqueeze(1)
+        
+        x_raw = self.layers(x_raw)
+        x_raw = self.global_avg_pool(x_raw)
+        x_raw = x_raw.flatten(1)
+        x_raw = self.raw_norm(x_raw)
+
+        x_spectral = self.spectral_dropout(x_spectral)
+        x_spectral = self.spectral_norm(x_spectral)
+
+        x_combined = torch.cat([x_raw, x_spectral], dim=1)
+        return self.classifier(x_combined)
+
 class ConcatterConfig(NetworkConfig):
     model_name: str = "Concatter"
     n_filters: List[int]

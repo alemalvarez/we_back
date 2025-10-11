@@ -1,66 +1,55 @@
 import os
-from typing import Literal, List
+from typing import Literal
 
 import wandb
 
 from core.logging import make_logger
 from core.schemas import (
-    NetworkConfig,
     OptimizerConfig,
     CriterionConfig,
     RunConfig,
     MultiDatasetConfig,
 )
 from core.builders import build_dataset
-from models.concatter import ConcatterConfig, GatedConcatterConfig
+from core.validate_kernel import validate_kernel
+from models.concatter import SimpleConcatterConfig
 from core.runner import run as run_single
 from core.evaluation import evaluate_with_config, pretty_print_per_subject
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
-def _build_head_hidden_sizes_from_str(head_hidden_sizes: str) -> List[int]:
-    return [int(size) for size in head_hidden_sizes.split("_")]
-
-def _build_network_from_wandb(cfg: wandb.Config) -> NetworkConfig:  # type: ignore[name-defined]
-    arch_string = cfg.get("arch")
-    if arch_string.startswith("concatter"):
-        alpha = arch_string.split("_")[1]
-        return ConcatterConfig(
-            model_name="Concatter",
-            n_filters=[16, 32, 64, 128],
-            kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
-            strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
-            raw_dropout_rate=float(cfg.get("raw_dropout_rate", 0.25)),
-            paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
-            activation="silu",
-            n_spectral_features=16,
-            spectral_dropout_rate=float(cfg.get("spectral_dropout_rate", 0.25)),
-            head_hidden_sizes=_build_head_hidden_sizes_from_str(cfg.get("head_hidden_sizes", "128_32")),
-            concat_dropout_rate=float(cfg.get("concat_dropout_rate", 0.25)),
-            alpha=float(alpha),
-        )
-    else:
-        gate_in_features = arch_string.split("_")[1]
-        return GatedConcatterConfig(
-            model_name="GatedConcatter",
-            n_filters=[16, 32, 64, 128],
-            kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
-            strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
-            raw_dropout_rate=float(cfg.get("raw_dropout_rate", 0.25)),
-            paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
-            activation="silu",
-            n_spectral_features=16,
-            spectral_dropout_rate=float(cfg.get("spectral_dropout_rate", 0.25)),
-            head_hidden_sizes=_build_head_hidden_sizes_from_str(cfg.get("head_hidden_sizes", "128_32")),
-            concat_dropout_rate=float(cfg.get("concat_dropout_rate", 0.25)),
-            gate_in_features=gate_in_features,
-        )
+def _parse_two_level(s: str) -> list:
+    """Parse two-level string parameters from wandb sweeps."""
+    s = s.strip()
+    if "__" in s:
+        return [[int(p) for p in g.split("_") if p] for g in s.split("__") if g]
+    return [int(p) for p in s.split("_") if p]
 
 
 def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore[name-defined]
-    network_config = _build_network_from_wandb(cfg)
+    n_filters = _parse_two_level(cfg.get("n_filters", "16_32_64_128"))
+    kernels = _parse_two_level(cfg.get("kernel_sizes", "100_3__15_10__10_3__5_2"))
+    strides = _parse_two_level(cfg.get("strides", "2_2__2_2__1_1__1_1"))
+    paddings = _parse_two_level(cfg.get("paddings", "25_1__5_2__5_1__1_1"))
+
+    input_shape = (1000, 68)
+
+    validate_kernel(kernels, strides, paddings, input_shape)
+
+    network_config = SimpleConcatterConfig(
+        model_name="SimpleConcatter",
+        n_filters=n_filters,
+        kernel_sizes=kernels,
+        strides=strides,
+        raw_dropout_rate=float(cfg.get("raw_dropout_rate", 0.25)),
+        paddings=paddings,
+        activation=cfg.get("activation", "silu"),
+        n_spectral_features=16,
+        head_hidden_sizes=_parse_two_level(cfg.get("head_hidden_sizes", "128_32")),
+        concat_dropout_rate=float(cfg.get("concat_dropout_rate", 0.25)),
+        spectral_dropout_rate=float(cfg.get("spectral_dropout_rate", 0.25)),
+    )
 
     optimizer_config = OptimizerConfig(
         learning_rate=float(cfg.get("learning_rate", 3e-3)),

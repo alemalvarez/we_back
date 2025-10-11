@@ -1,0 +1,102 @@
+name: multi-bayes-sweep
+method: bayes
+metric:
+  name: val/final_f1
+  goal: maximize
+run_cap: 100
+
+parameters:
+  # Convolutional architecture
+  n_filters:
+    values:
+      - "16_32_64_128"
+      - "32_64_128_256"
+      - "16_32_64"
+      - "8_16_32_64"
+  
+  kernel_sizes:
+    values:
+      - "100_3__15_10__10_3__5_2"
+      - "50_3__10_5__5_3__3_2"
+      - "150_5__20_10__15_5__5_3"
+  
+  strides:
+    values:
+      - "2_2__2_2__1_1__1_1"
+      - "3_2__2_2__1_1__1_1"
+      - "2_1__2_1__1_1__1_1"
+  
+  paddings:
+    values:
+      - "25_1__5_2__5_1__1_1"
+      - "12_1__3_1__2_1__1_1"
+      - "37_2__10_5__7_2__2_1"
+  
+  # Head architecture
+  head_hidden_sizes:
+    values:
+      - "128_32"
+      - "256_64"
+      - "64_16"
+      - "128_64_32"
+      - "256_128_64"
+  
+  # Activation function
+  activation:
+    values:
+      - silu
+      - relu
+      - gelu
+      - leaky_relu
+  
+  # Training hyperparameters (continuous)
+  learning_rate:
+    distribution: log_uniform_values
+    min: 1.0e-4
+    max: 1.0e-2
+  
+  batch_size:
+    values: [16, 32, 64, 128]
+  
+  # Dropout rates (continuous)
+  raw_dropout_rate:
+    distribution: uniform
+    min: 0.1
+    max: 0.7
+  
+  spectral_dropout_rate:
+    distribution: uniform
+    min: 0.1
+    max: 0.7
+  
+  concat_dropout_rate:
+    distribution: uniform
+    min: 0.1
+    max: 0.7
+  
+  # Loss weight (continuous)
+  pos_weight_value:
+    distribution: uniform
+    min: 0.5
+    max: 1.5
+  
+  # Dataset normalization
+  raw_normalization:
+    values:
+      - channel-subject
+      - sample-channel
+      - sample
+      - subject
+      - channel
+      - full
+
+program: experiments.AD_vs_HC.combined.multi.sweep
+
+command:
+  - ${env}
+  - uv
+  - run
+  - -m
+  - ${program}
+  - ${args}
+

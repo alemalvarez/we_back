@@ -13,7 +13,7 @@ from core.runner import run as run_single
 from core.evaluation import evaluate_with_config, pretty_print_per_subject
 from core.logging import make_logger
 
-from models.concatter import ConcatterConfig, GatedConcatterConfig
+from models.concatter import GatedConcatterConfig
 
 
 load_dotenv()

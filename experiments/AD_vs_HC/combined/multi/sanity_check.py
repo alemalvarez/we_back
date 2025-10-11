@@ -9,7 +9,7 @@ from core.schemas import (
 from core.cv import build_dataset
 from core.sanity_test_model import sanity_test_model
 
-from models.concatter import GatedConcatterConfig
+from models.concatter import SimpleConcatterConfig
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -23,8 +23,8 @@ def main() -> None:
     splits_dir = "experiments/AD_vs_HC/combined/raw/splits"
     train_subjects_path = os.path.join(splits_dir, "training_subjects.txt")
 
-    model_config = GatedConcatterConfig(
-        model_name="GatedConcatter",
+    model_config = SimpleConcatterConfig(
+        model_name="SimpleConcatter",
         n_filters=[16, 32, 64, 128],
         kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
         strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
