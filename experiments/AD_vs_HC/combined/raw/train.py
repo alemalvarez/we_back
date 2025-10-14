@@ -1,4 +1,5 @@
 from core.builders import build_dataset
+from core.evaluation import evaluate_with_config, pretty_print_per_subject
 from core.schemas import OptimizerConfig, CriterionConfig, RawDatasetConfig, RunConfig
 from dotenv import load_dotenv
 import os
@@ -79,6 +80,16 @@ trained_model = run_single(
     validation_dataset=validation_dataset,
     logger_sink=magic_logger,
 )
+
+results = evaluate_with_config(
+    model=trained_model,
+    dataset=validation_dataset,
+    run_config=run_config,
+    logger_sink=magic_logger,
+    prefix="val",
+)
+
+pretty_print_per_subject(results.per_subject)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 save_path = os.path.join(script_dir, f"{model_config.model_name}_trained.pt")
