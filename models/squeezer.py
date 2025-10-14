@@ -12,11 +12,12 @@ from core.schemas import NetworkConfig
 class SEBlock(nn.Module):
     def __init__(self, in_channels: int, reduction_ratio: int = 16):
         super(SEBlock, self).__init__()
+        bottleneck_channels = max(in_channels // reduction_ratio, 1)
         self.squeeze = nn.AdaptiveAvgPool2d(1)
         self.excitation = nn.Sequential(
-            nn.Linear(in_channels, in_channels // reduction_ratio, bias=False),
+            nn.Linear(in_channels, bottleneck_channels, bias=False),
             nn.ReLU(inplace=True),
-            nn.Linear(in_channels // reduction_ratio, in_channels),
+            nn.Linear(bottleneck_channels, in_channels, bias=False),
             nn.Sigmoid()
         )
 
@@ -25,7 +26,7 @@ class SEBlock(nn.Module):
         y = self.squeeze(x).view(b, c)
         y = self.excitation(y)
         y = y.view(b, c, 1, 1)
-        return x * y
+        return x * y.expand_as(x)
 
 class DeeperSEConfig(NetworkConfig):
     model_name: str = "DeeperSE"
