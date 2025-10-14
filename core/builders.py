@@ -10,6 +10,7 @@ from models.simple_2d import Simple2D3Layers, DeeperCustom, Deeper2D, Improved2D
 from models.spectral_net import SpectralNet
 from core.spectral_dataset import SpectralDataset
 from core.raw_dataset import RawDataset
+from models.squeezer import DeeperSE
 
 def build_model(config: NetworkConfig) -> nn.Module: 
     name_class_map = {
@@ -21,6 +22,7 @@ def build_model(config: NetworkConfig) -> nn.Module:
         "Concatter": Concatter,
         "GatedConcatter": GatedConcatter,
         "SimpleConcatter": SimpleConcatter,
+        "DeeperSE": DeeperSE,
     }
     return name_class_map[config.model_name](config)
 
