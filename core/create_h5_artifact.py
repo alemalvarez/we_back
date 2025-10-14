@@ -200,8 +200,8 @@ class DatasetCreator:
                 # Track and validate sampling frequency across files
                 fs_in = int(cfg['fs'])
                 seen_fs.add(fs_in)
-                if downsampling_freq is None and include_raw and len(seen_fs) > 1:
-                    raise ValueError(f"Multiple sampling rates found {sorted(seen_fs)} with include_raw=True and no downsampling_freq set.")
+                if downsampling_freq is None and len(seen_fs) > 1:
+                    raise ValueError(f"Multiple sampling rates found {sorted(seen_fs)} and no downsampling_freq set. This will cause inconsistent spectral feature resolution.")
 
                 # If requested, resample to target frequency before any further processing
                 if downsampling_freq is not None and fs_in != downsampling_freq:

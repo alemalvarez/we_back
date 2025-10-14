@@ -6,6 +6,7 @@ from pydantic import model_validator
 from torch import nn
 import torch
 
+from core import validate_kernel
 from core.schemas import NetworkConfig
 
 
@@ -37,19 +38,18 @@ class DeeperSEConfig(NetworkConfig):
     paddings: List[Tuple[int, int]]
     activation: str
     reduction_ratio: int
-
-    @model_validator(mode="after")
-    def validate_lengths(self):
-        assert len(self.n_filters) == 4, "n_filters must have length 4"
-        assert len(self.kernel_sizes) == 4, "kernel_sizes must have length 4"
-        assert len(self.strides) == 4, "strides must have length 4"
-        assert len(self.paddings) == 4, "paddings must have length 4"
-        return self
+    input_shape: Tuple[int, int] = (1000, 68)
 
     @model_validator(mode="after")
     def validate_reduction_ratio(self):
         assert self.reduction_ratio > 0, "reduction_ratio must be positive"
         return self
+
+    @model_validator(mode="after")
+    def validate_kernel_params(self):
+        if not validate_kernel(self.kernel_sizes, self.strides, self.paddings, self.input_shape):
+            raise ValueError("Invalid kernel parameters")
+        return self 
 
 class DeeperSE(nn.Module):
     def __init__(self, cfg: DeeperSEConfig):
@@ -70,7 +70,7 @@ class DeeperSE(nn.Module):
 
         layers = []
         in_channels = 1
-        for i in range(4):
+        for i in range(len(cfg.n_filters)):
             layers.append(nn.Sequential(
                 nn.Conv2d(in_channels, cfg.n_filters[i], cfg.kernel_sizes[i], cfg.strides[i], cfg.paddings[i]),
                 nn.BatchNorm2d(cfg.n_filters[i]),
@@ -83,7 +83,7 @@ class DeeperSE(nn.Module):
         self.layers = nn.Sequential(*layers)
 
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.classifier = nn.Linear(cfg.n_filters[3], 1)
+        self.classifier = nn.Linear(cfg.n_filters[-1], 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.dim() == 3:
