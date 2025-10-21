@@ -26,6 +26,8 @@ def main() -> None:
         "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5",
     )
 
+    h5_file_path = "harmonized_raw_features.h5"
+
     splits_dir = "experiments/AD_vs_HC/combined/spectral/splits"
     train_subjects_path = os.path.join(splits_dir, "training_subjects.txt")
     val_subjects_path = os.path.join(splits_dir, "validation_subjects.txt")
@@ -33,10 +35,16 @@ def main() -> None:
 
     n_folds = 5
 
-    model_config = SpectralNetConfig()
+    model_config = SpectralNetConfig(
+        model_name="SpectralNet",
+        input_size=16,
+        hidden_1_size=128,
+        hidden_2_size=64,
+        dropout_rate=0.3104725476874634,
+    )
     optimizer_config = OptimizerConfig(
-        learning_rate=3e-2,
-        weight_decay=None,
+        learning_rate=0.0061101875184043,
+        weight_decay=6.227019985574894e-06,
         use_cosine_annealing=True,
         cosine_annealing_t_0=5,
         cosine_annealing_t_mult=1,
@@ -57,13 +65,13 @@ def main() -> None:
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         random_seed=42,
-        batch_size=32,
+        batch_size=64,
         max_epochs=50,
-        patience=5,
+        patience=20,
         min_delta=0.001,
         early_stopping_metric='loss',
         dataset_config=dataset_config,
-        log_to_wandb=True,
+        log_to_wandb=False,
         wandb_init=None,
     )
 

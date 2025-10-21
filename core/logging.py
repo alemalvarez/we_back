@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Mapping, Optional, Protocol, Sequence
 
 from loguru import logger as _console
+import sys
 
 
 class Logger(Protocol):
@@ -32,6 +33,13 @@ class ConsoleLogger:
 
     This logger is safe to use everywhere, including sweeps and CV.
     """
+    def __init__(self):
+        _console.remove()
+        _console.add(
+            sys.stdout,
+            level="TRACE",
+            format="<level>{level: <8}</level> | <level>{message}</level>"
+        )
 
     def log_params(self, params: Mapping[str, Any]) -> None:  # type: ignore[override]
         if not params:

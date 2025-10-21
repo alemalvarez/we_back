@@ -29,3 +29,4 @@ plots/
 
 # Ignore everything inside checkpoints folder
 checkpoints/
+*.csv

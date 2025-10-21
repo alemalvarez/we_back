@@ -39,6 +39,7 @@ def run(
     training_dataset: Dataset,
     validation_dataset: Dataset,
     logger_sink: Optional[Logger] = None,
+    metric_prefix: str = "",
     ):
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
@@ -92,15 +93,16 @@ def run(
                     f"f1={results.val_f1:.4f} mcc={results.val_mcc:.4f} kappa={results.val_kappa:.4f} | "
                     f"time={results.epoch_time:.2f}s")
 
+        prefix = f"{metric_prefix}/" if metric_prefix else ""
         magic_logger.log_metrics({
-            "train/loss": results.train_loss,
-            "train/accuracy": results.train_accuracy,
-            "val/loss": results.val_loss,
-            "val/accuracy": results.val_accuracy,
-            "val/f1": results.val_f1,
-            "val/mcc": results.val_mcc,
-            "val/kappa": results.val_kappa,
-            "epoch/time": results.epoch_time,
+            f"{prefix}train/loss": results.train_loss,
+            f"{prefix}train/accuracy": results.train_accuracy,
+            f"{prefix}val/loss": results.val_loss,
+            f"{prefix}val/accuracy": results.val_accuracy,
+            f"{prefix}val/f1": results.val_f1,
+            f"{prefix}val/mcc": results.val_mcc,
+            f"{prefix}val/kappa": results.val_kappa,
+            f"{prefix}epoch/time": results.epoch_time,
         }, step=epoch)
 
         if config.early_stopping_metric == 'loss':
