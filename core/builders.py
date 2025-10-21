@@ -8,6 +8,7 @@ from core.schemas import NetworkConfig, OptimizerConfig, CriterionConfig, Datase
 from models.concatter import Concatter, GatedConcatter, SimpleConcatter
 from models.simple_2d import Simple2D3Layers, DeeperCustom, Deeper2D, Improved2D
 from models.spectral_net import SpectralNet
+from models.spectral_net import AdvancedSpectralNet
 from core.spectral_dataset import SpectralDataset
 from core.raw_dataset import RawDataset
 from models.squeezer import DeeperSE
@@ -19,6 +20,7 @@ def build_model(config: NetworkConfig) -> nn.Module:
         "Improved2D": Improved2D,
         "Simple2D3Layers": Simple2D3Layers,
         "SpectralNet": SpectralNet,
+        "AdvancedSpectralNet": AdvancedSpectralNet,
         "Concatter": Concatter,
         "GatedConcatter": GatedConcatter,
         "SimpleConcatter": SimpleConcatter,

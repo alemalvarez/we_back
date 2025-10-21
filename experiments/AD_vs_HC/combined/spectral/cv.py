@@ -11,7 +11,7 @@ from core.logging import make_logger
 from core.cv import run_cv
 
 from models.spectral_net import SpectralNetConfig
-
+from models.spectral_net import AdvancedSpectralNetConfig
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -35,12 +35,14 @@ def main() -> None:
 
     n_folds = 5
 
-    model_config = SpectralNetConfig(
-        model_name="SpectralNet",
+    model_config = AdvancedSpectralNetConfig(
+        model_name="AdvancedSpectralNet",
         input_size=16,
-        hidden_1_size=128,
-        hidden_2_size=64,
-        dropout_rate=0.3104725476874634,
+        hidden_1_size=16,
+        hidden_2_size=32,
+        dropout_rate=0.5,
+        add_batch_norm=True,
+        activation="relu",
     )
     optimizer_config = OptimizerConfig(
         learning_rate=0.0061101875184043,

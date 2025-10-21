@@ -11,7 +11,7 @@ from core.schemas import (
     SpectralDatasetConfig,
 )
 from core.cv import run_cv
-from models.spectral_net import SpectralNetConfig
+from models.spectral_net import AdvancedSpectralNetConfig
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,52 +23,47 @@ def _read_subjects(path: str) -> List[str]:
 
 
 def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore[name-defined]
-    network_config = SpectralNetConfig(
-        model_name="SpectralNet",
-        input_size=int(cfg.get("input_size", 16)),
+    network_config = AdvancedSpectralNetConfig(
+        model_name="AdvancedSpectralNet",
+        input_size=16,
         hidden_1_size=int(cfg.get("hidden_1_size", 16)),
-        hidden_2_size=int(cfg.get("hidden_2_size", 16)),
-        dropout_rate=float(cfg.get("dropout_rate", 0.25)),
+        hidden_2_size=int(cfg.get("hidden_2_size", 32)),
+        dropout_rate=float(cfg.get("dropout_rate", 0.5)),
+        add_batch_norm=True,
+        activation=cfg.get("activation", "relu"),
     )
 
     optimizer_config = OptimizerConfig(
         learning_rate=float(cfg.get("learning_rate", 3e-3)),
         weight_decay=float(cfg.get("weight_decay", 0.0)) if cfg.get("weight_decay") is not None else None,
-        use_cosine_annealing=bool(cfg.get("use_cosine_annealing", False)),
-        cosine_annealing_t_0=int(cfg.get("cosine_annealing_t_0", 5)),
-        cosine_annealing_t_mult=int(cfg.get("cosine_annealing_t_mult", 1)),
-        cosine_annealing_eta_min=float(cfg.get("cosine_annealing_eta_min", 1e-6)),
+        use_cosine_annealing=False,
     )
 
-    pw_type_str = str(cfg.get("pos_weight_type", "fixed"))
-    pw_type_lit: Literal['fixed','multiplied'] = pw_type_str if pw_type_str in ("fixed","multiplied") else "fixed"  # type: ignore[assignment]
     criterion_config = CriterionConfig(
-        pos_weight_type=pw_type_lit,
-        pos_weight_value=float(cfg.get("pos_weight_value", 1.0)),
+        pos_weight_type="multiplied",
+        pos_weight_value=1.0,
     )
-
-    esm_str = str(cfg.get("early_stopping_metric", "mcc"))
-    esm_lit: Literal['loss','f1','mcc','kappa'] = esm_str if esm_str in ("loss","f1","mcc","kappa") else "loss"  # type: ignore[assignment]
 
     norm_str = str(cfg.get("normalization", "standard"))
     norm_lit: Literal['min-max','standard','none'] = norm_str if norm_str in ("min-max","standard","none") else "standard"  # type: ignore[assignment]
-
 
     h5_file_path = os.getenv(
         "H5_FILE_PATH",
         "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5",
     )
 
+    h5_file_path = "harmonized_raw_features.h5"
+
     run_config = RunConfig(
         network_config=network_config,
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
-        random_seed=int(cfg.get("random_seed", 42)),
-        batch_size=int(cfg.get("batch_size", 32)),
-        max_epochs=int(cfg.get("max_epochs", 50)),
-        patience=int(cfg.get("patience", 15)),
-        min_delta=float(cfg.get("min_delta", 0.001)),
-        early_stopping_metric=esm_lit,
+        random_seed=int(os.getenv("RANDOM_SEED", 42)),
+        batch_size=128,
+        max_epochs=500,
+        patience=15,
+        min_delta=0.001,
+        early_stopping_metric="loss",
         dataset_config=SpectralDatasetConfig(
             h5_file_path=h5_file_path,
             spectral_normalization=norm_lit,
@@ -107,7 +102,7 @@ def main() -> None:
         n_folds=n_folds,
         run_config=run_config,
         magic_logger=magic_logger,
-        min_fold_mcc=.35,
+        min_fold_mcc=.40,
     )
 
     magic_logger.finish()

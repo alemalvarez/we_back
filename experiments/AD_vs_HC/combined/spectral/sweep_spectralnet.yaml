@@ -1,9 +1,9 @@
-name: spectral_net_sweep
+name: advanced_spectral_net_sweep
 method: bayes
 metric:
-  name: cv/final_f1_mean
+  name: cv/segment_level_final_f1_mean
   goal: maximize
-run_cap: 30
+run_cap: 50
 
 parameters:
   learning_rate:
@@ -18,20 +18,21 @@ parameters:
 
   dropout_rate:
     distribution: uniform
-    min: 0.10
-    max: 0.7
-
-  batch_size:
-    values: [32, 64, 128, 256]
+    min: 0.3
+    max: 0.5
 
   hidden_1_size:
-    values: [16, 32, 64, 128]
+    values: [16, 32]
 
   hidden_2_size:
-    values: [8, 16, 32, 64]
+    values: [8, 16, 32, 64, 128]
 
-  patience:
-    values: [5, 10, 15, 20]
+  activation:
+    values: [leaky_relu, gelu, silu]
+
+  normalization:
+    values: [standard, min-max, none]
+
 
 program: experiments.AD_vs_HC.combined.spectral.sweep
 
