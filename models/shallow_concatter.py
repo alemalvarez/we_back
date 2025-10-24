@@ -49,7 +49,7 @@ class ShallowerConcatter(nn.Module):
                 stride=cfg.strides[0],
                 padding=cfg.paddings[0],
             ),
-            nn.BatchNorm2d(cfg.n_filters[0]),
+            nn.GroupNorm(num_groups=min(cfg.n_filters[0], 4), num_channels=cfg.n_filters[0]),
             act,
             nn.Dropout(cfg.raw_dropout_rate),
             nn.Conv2d(
@@ -59,7 +59,7 @@ class ShallowerConcatter(nn.Module):
                 stride=cfg.strides[1],
                 padding=cfg.paddings[1],
             ),
-            nn.BatchNorm2d(cfg.n_filters[1]),
+            nn.GroupNorm(num_groups=min(cfg.n_filters[1], 4), num_channels=cfg.n_filters[1]),
             act,
             nn.Dropout(cfg.raw_dropout_rate),
         )
@@ -70,6 +70,7 @@ class ShallowerConcatter(nn.Module):
 
         self.spec_net = nn.Sequential(
             nn.Linear(cfg.n_spectral_features, cfg.spectral_hidden_size),
+            nn.BatchNorm1d(cfg.spectral_hidden_size),
             act,
             nn.Dropout(cfg.spectral_dropout_rate),
         )

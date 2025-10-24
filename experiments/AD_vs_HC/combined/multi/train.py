@@ -23,38 +23,46 @@ H5_FILE_PATH = os.getenv("H5_FILE_PATH", "artifacts/combined_DK_features_only:v0
 
 
 if __name__ == "__main__":
+    # To address overfitting, you can try several strategies:
+    # 1. Increase dropout rates.
+    # 2. Use stronger regularization, e.g., increase weight_decay in optimizer.
+    # 3. Try reducing model complexity (fewer filters, smaller hidden sizes).
+    # 4. Add early stopping or make it more aggressive (lower patience/min_delta).
+    # 5. Increase dataset size or augment data if possible.
+
+    # BREAKTHROUGH CONFIG: Keep aggressive downsampling, slightly more capacity
     model_config = ShallowerConcatterConfig(
         model_name="ShallowerConcatter",
-        n_filters=[16, 32],
-        kernel_sizes=[(100, 3), (15, 10)],
-        strides=[(2, 2), (2, 2)],
-        raw_dropout_rate=0.31158910319253397,
-        paddings=[(25, 1), (5, 2)],
+        n_filters=[8, 16],  # gentle increase from 4,8
+        kernel_sizes=[(50, 2), (10, 5)],  # KEEP these - they work
+        strides=[(10, 5), (8, 4)],  # KEEP aggressive downsampling - this is KEY
+        raw_dropout_rate=0.70,  # reduce slightly from 0.75
+        paddings=[(5, 0), (1, 1)],
         activation="silu",
         n_spectral_features=16,
-        spectral_hidden_size=32,
-        spectral_dropout_rate=0.31158910319253397,
-        concat_dropout_rate=0.31158910319253397,
+        spectral_hidden_size=64,
+        spectral_dropout_rate=0.25,
+        concat_dropout_rate=0.50,  # reduce from 0.55
         fusion_hidden_size=128,
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=0.004255107493153422,
-        weight_decay=9.6832252733516e-05,
-        use_cosine_annealing=False,
-        cosine_annealing_t_0=8,
+        learning_rate=0.006,  # slightly higher initial LR
+        weight_decay=0.003,  # reduce L2 a bit to allow more learning
+        use_cosine_annealing=True,
+        cosine_annealing_t_0=10,
         cosine_annealing_t_mult=2,
-        cosine_annealing_eta_min=1e-6,
+        cosine_annealing_eta_min=1e-5,
     )
 
     criterion_config = CriterionConfig(
         pos_weight_type='multiplied',
-        pos_weight_value=1.09784373282656,
+        pos_weight_value=1.0,
     )
 
     dataset_config = MultiDatasetConfig(
         h5_file_path=H5_FILE_PATH,
-        raw_normalization='channel-subject',
+        raw_normalization='sample-channel',  # per-sample normalization
         spectral_normalization='standard',
     )
 
@@ -63,10 +71,10 @@ if __name__ == "__main__":
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         random_seed=42,
-        batch_size=128,
-        max_epochs=50,
-        patience=5,
-        min_delta=0.001,
+        batch_size=64,  # smaller batches = more gradient noise = regularization
+        max_epochs=100,  # allow longer training like spectral
+        patience=15,  # more patience
+        min_delta=0.0005,  # less aggressive stopping
         early_stopping_metric='loss',
         dataset_config=dataset_config,
         log_to_wandb=False,

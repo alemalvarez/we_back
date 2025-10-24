@@ -1,8 +1,9 @@
 import os
-from typing import Literal
+from typing import Literal, List
 
 import wandb
 
+from core.cv import run_cv
 from core.logging import make_logger
 from core.schemas import (
     OptimizerConfig,
@@ -10,11 +11,8 @@ from core.schemas import (
     RunConfig,
     MultiDatasetConfig,
 )
-from core.builders import build_dataset
 from core.validate_kernel import validate_kernel
-from models.concatter import SimpleConcatterConfig
-from core.runner import run as run_single
-from core.evaluation import evaluate_with_config, pretty_print_per_subject
+from models.shallow_concatter import ShallowerConcatterConfig
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -25,6 +23,10 @@ def _parse_two_level(s: str) -> list:
     if "__" in s:
         return [[int(p) for p in g.split("_") if p] for g in s.split("__") if g]
     return [int(p) for p in s.split("_") if p]
+
+def _read_subjects(path: str) -> List[str]:
+    with open(path, "r") as f:
+        return [line.strip() for line in f if line.strip()]
 
 
 def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore[name-defined]
@@ -37,8 +39,8 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
 
     validate_kernel(kernels, strides, paddings, input_shape)
 
-    network_config = SimpleConcatterConfig(
-        model_name="SimpleConcatter",
+    network_config = ShallowerConcatterConfig(
+        model_name="ShallowerConcatter",
         n_filters=n_filters,
         kernel_sizes=kernels,
         strides=strides,
@@ -46,23 +48,21 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         paddings=paddings,
         activation=cfg.get("activation", "silu"),
         n_spectral_features=16,
-        head_hidden_sizes=_parse_two_level(cfg.get("head_hidden_sizes", "128_32")),
+        spectral_hidden_size=int(cfg.get("spectral_hidden_size", 32)),
         concat_dropout_rate=float(cfg.get("concat_dropout_rate", 0.25)),
         spectral_dropout_rate=float(cfg.get("spectral_dropout_rate", 0.25)),
+        fusion_hidden_size=int(cfg.get("fusion_hidden_size", 128)),
     )
 
     optimizer_config = OptimizerConfig(
         learning_rate=float(cfg.get("learning_rate", 3e-3)),
-        weight_decay=None,
+        weight_decay=float(cfg.get("weight_decay", 0.0)),
         use_cosine_annealing=False,
-        cosine_annealing_t_0=5,
-        cosine_annealing_t_mult=1,
-        cosine_annealing_eta_min=1e-6,
     )
 
     criterion_config = CriterionConfig(
         pos_weight_type="multiplied",
-        pos_weight_value=float(cfg.get("pos_weight_value", 1.0)),
+        pos_weight_value=1.0
     )
 
     h5_file_path = os.getenv(
@@ -78,7 +78,7 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         criterion_config=criterion_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
         batch_size=int(cfg.get("batch_size", 32)),
-        max_epochs=30,
+        max_epochs=50,
         patience=5,
         min_delta=0.001,
         early_stopping_metric="loss",
@@ -109,37 +109,20 @@ def main() -> None:
         "experiments/AD_vs_HC/combined/multi/splits/validation_subjects.txt",
     )
 
-    run_config = build_run_config_from_wandb(cfg)
+    all_subjects = _read_subjects(train_subjects_path) + _read_subjects(val_subjects_path)
+    n_folds = 5
 
-    training_dataset = build_dataset(
-        run_config.dataset_config,
-        subjects_path=train_subjects_path,
-        validation=False,
-    )
-    validation_dataset = build_dataset(
-        run_config.dataset_config,
-        subjects_path=val_subjects_path,
-        validation=True,
-    )
+    run_config = build_run_config_from_wandb(cfg)
     
     magic_logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)
 
-    trained_model = run_single(
-        config=run_config,
-        training_dataset=training_dataset,
-        validation_dataset=validation_dataset,
-        logger_sink=magic_logger,
-    )
-
-    result = evaluate_with_config(
-        model=trained_model,
-        dataset=validation_dataset,
+    run_cv(
+        all_subjects=all_subjects,
+        n_folds=n_folds,
         run_config=run_config,
-        logger_sink=magic_logger,
-        prefix="val",
+        magic_logger=magic_logger,
+        min_fold_mcc=.37,
     )
-
-    pretty_print_per_subject(result.per_subject)
 
     magic_logger.finish()
 
