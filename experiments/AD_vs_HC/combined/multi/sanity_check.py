@@ -9,7 +9,7 @@ from core.schemas import (
 from core.cv import build_dataset
 from core.sanity_test_model import sanity_test_model
 
-from models.concatter import SimpleConcatterConfig
+from models.shallow_concatter import ShallowerConcatterConfig
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -20,21 +20,24 @@ def main() -> None:
         "h5test_raw_only.h5",
     )
 
-    splits_dir = "experiments/AD_vs_HC/combined/raw/splits"
+    h5_file_path = "test.h5"
+
+    splits_dir = "experiments/AD_vs_HC/combined/multi/splits"
     train_subjects_path = os.path.join(splits_dir, "training_subjects.txt")
 
-    model_config = SimpleConcatterConfig(
-        model_name="SimpleConcatter",
-        n_filters=[16, 32, 64, 128],
-        kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
-        strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
+    model_config = ShallowerConcatterConfig(
+        model_name="ShallowerConcatter",
+        n_filters=[16, 32],
+        kernel_sizes=[(100, 3), (15, 10)],
+        strides=[(2, 2), (2, 2)],
         raw_dropout_rate=0.31158910319253397,
-        paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
+        paddings=[(25, 1), (5, 2)],
         activation="silu",
         n_spectral_features=16,
-        head_hidden_sizes=[128, 32],
+        spectral_hidden_size=32,
+        spectral_dropout_rate=0.31158910319253397,
         concat_dropout_rate=0.31158910319253397,
-        spectral_dropout_rate=0.5,
+        fusion_hidden_size=128,
     )
     optimizer_config = OptimizerConfig(
         learning_rate=0.004255107493153422,

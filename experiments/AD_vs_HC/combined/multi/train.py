@@ -13,7 +13,7 @@ from core.runner import run as run_single
 from core.evaluation import evaluate_with_config, pretty_print_per_subject
 from core.logging import make_logger
 
-from models.concatter import GatedConcatterConfig
+from models.shallow_concatter import ShallowerConcatterConfig
 
 
 load_dotenv()
@@ -23,19 +23,19 @@ H5_FILE_PATH = os.getenv("H5_FILE_PATH", "artifacts/combined_DK_features_only:v0
 
 
 if __name__ == "__main__":
-    model_config = GatedConcatterConfig(
-        model_name="GatedConcatter",
-        n_filters=[16, 32, 64, 128],
-        kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
-        strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
+    model_config = ShallowerConcatterConfig(
+        model_name="ShallowerConcatter",
+        n_filters=[16, 32],
+        kernel_sizes=[(100, 3), (15, 10)],
+        strides=[(2, 2), (2, 2)],
         raw_dropout_rate=0.31158910319253397,
-        paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
+        paddings=[(25, 1), (5, 2)],
         activation="silu",
         n_spectral_features=16,
-        spectral_dropout_rate=0.5,
-        head_hidden_sizes=[128, 32],
+        spectral_hidden_size=32,
+        spectral_dropout_rate=0.31158910319253397,
         concat_dropout_rate=0.31158910319253397,
-        gate_in_features="raw",
+        fusion_hidden_size=128,
     )
 
     optimizer_config = OptimizerConfig(

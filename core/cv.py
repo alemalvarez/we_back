@@ -230,7 +230,7 @@ def run_cv(
 
     keys = [
         "final_accuracy", "final_f1", "final_precision", "final_recall", "final_mcc", "final_roc_auc", "final_loss",
-        "final_tn", "final_fp", "final_fn", "final_tp"
+        "final_tn", "final_fp", "final_fn", "final_tp", "final_kappa"
     ]
     # Compute and log CV summary metrics
     cv_summary_metrics = {}

@@ -10,7 +10,6 @@ from core.schemas import (
 from core.logging import make_logger
 from core.cv import run_cv
 
-from models.spectral_net import SpectralNetConfig
 from models.spectral_net import AdvancedSpectralNetConfig
 from dotenv import load_dotenv
 load_dotenv()

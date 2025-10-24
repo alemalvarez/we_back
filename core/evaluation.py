@@ -16,6 +16,7 @@ from sklearn.metrics import (  # type: ignore
     precision_recall_curve,
     confusion_matrix,
     matthews_corrcoef,
+    cohen_kappa_score,
 )
 from loguru import logger
 
@@ -149,6 +150,7 @@ def evaluate_dataset(
     metrics[f"{prefix}/final_precision"] = float(precision_score(y_true, y_pred))
     metrics[f"{prefix}/final_recall"] = float(recall_score(y_true, y_pred))
     metrics[f"{prefix}/final_mcc"] = float(matthews_corrcoef(y_true, y_pred))
+    metrics[f"{prefix}/final_kappa"] = float(cohen_kappa_score(y_true, y_pred))
     metrics[f"{prefix}/final_best_threshold"] = best_threshold
 
     # Optional per-subject breakdown

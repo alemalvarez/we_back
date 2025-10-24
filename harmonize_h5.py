@@ -4,8 +4,8 @@ Harmonize H5 file using control-based normalization per database.
 Applies the same harmonization logic as shown in norm2.ipynb.
 """
 
-import h5py
-import pandas as pd
+import h5py      # type: ignore
+import pandas as pd      # type: ignore
 import numpy as np
 import re
 import argparse
@@ -44,21 +44,21 @@ def load_h5_to_dataframe(h5_path: str) -> pd.DataFrame:
             sp = subj_group["spectral"]["spectral_parameters"]
 
             data_dict = {}
-            n_segments = None
+            n_segments: int = 0
             for feat in spectral_features:
                 data = sp[feat][()]
                 if feat == "relative_powers" and data.ndim == 2:
-                    if n_segments is None:
+                    if n_segments == 0:
                         n_segments = data.shape[0]
                     for j, band_name in enumerate(relative_power_band_names):
                         col_name = f"relative_powers_{band_name}"
                         data_dict[col_name] = data[:, j]
                 elif data.ndim == 1:
-                    if n_segments is None:
+                    if n_segments == 0:
                         n_segments = data.shape[0]
                     data_dict[feat] = data
                 elif data.ndim == 2:
-                    if n_segments is None:
+                    if n_segments == 0:
                         n_segments = data.shape[0]
                     for j in range(data.shape[1]):
                         col_name = f"{feat}_{j}"
@@ -124,6 +124,10 @@ def dataframe_to_h5(df: pd.DataFrame, output_path: str, original_h5_path: str):
     subject_groups = df.groupby("Subject")
 
     with h5py.File(original_h5_path, "r") as orig_f, h5py.File(output_path, "w") as out_f:
+        # Copy root-level attributes
+        for attr_name, attr_value in orig_f.attrs.items():
+            out_f.attrs[attr_name] = attr_value
+        
         # Copy the root structure
         subjects_group = out_f.create_group("subjects")
 
@@ -134,6 +138,10 @@ def dataframe_to_h5(df: pd.DataFrame, output_path: str, original_h5_path: str):
             # Copy attributes
             for attr_name, attr_value in orig_subj.attrs.items():
                 out_subj.attrs[attr_name] = attr_value
+
+            # Copy raw_segments if it exists
+            if "raw_segments" in orig_subj:
+                out_subj.copy(orig_subj["raw_segments"], "raw_segments")
 
             # Copy spectral group structure
             spectral_group = out_subj.create_group("spectral")
