@@ -49,6 +49,12 @@ parameters:
       - 128
       - 256
 
+  gap_length:
+    values:
+      - 1
+      - 2
+      - 4
+
   raw_dropout_rate:
     distribution: uniform
     min: 0.1

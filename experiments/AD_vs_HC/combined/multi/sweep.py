@@ -52,6 +52,7 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         concat_dropout_rate=float(cfg.get("concat_dropout_rate", 0.25)),
         spectral_dropout_rate=float(cfg.get("spectral_dropout_rate", 0.25)),
         fusion_hidden_size=int(cfg.get("fusion_hidden_size", 128)),
+        gap_length=int(cfg.get("gap_length", 1)),
     )
 
     optimizer_config = OptimizerConfig(

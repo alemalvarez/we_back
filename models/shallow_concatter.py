@@ -20,6 +20,7 @@ class ShallowerConcatterConfig(NetworkConfig):
     spectral_hidden_size: int
     concat_dropout_rate: float
     fusion_hidden_size: int
+    gap_length: int
 
 class ShallowerConcatter(nn.Module):
     def __init__(
@@ -64,13 +65,13 @@ class ShallowerConcatter(nn.Module):
             nn.Dropout(cfg.raw_dropout_rate),
         )
 
-        gap_size = (4, 4)
+        gap_size = (cfg.gap_length, cfg.gap_length)
 
         self.gap = nn.AdaptiveAvgPool2d(gap_size)
 
         self.spec_net = nn.Sequential(
             nn.Linear(cfg.n_spectral_features, cfg.spectral_hidden_size),
-            nn.BatchNorm1d(cfg.spectral_hidden_size),
+            # nn.BatchNorm1d(cfg.spectral_hidden_size),  # i got very good results without this but must be researched
             act,
             nn.Dropout(cfg.spectral_dropout_rate),
         )

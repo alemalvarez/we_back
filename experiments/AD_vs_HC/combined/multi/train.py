@@ -44,6 +44,7 @@ if __name__ == "__main__":
         spectral_dropout_rate=0.25,
         concat_dropout_rate=0.50,  # reduce from 0.55
         fusion_hidden_size=128,
+        gap_length=1,
     )
 
     optimizer_config = OptimizerConfig(
