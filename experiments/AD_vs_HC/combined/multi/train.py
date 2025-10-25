@@ -23,33 +23,25 @@ H5_FILE_PATH = os.getenv("H5_FILE_PATH", "artifacts/combined_DK_features_only:v0
 
 
 if __name__ == "__main__":
-    # To address overfitting, you can try several strategies:
-    # 1. Increase dropout rates.
-    # 2. Use stronger regularization, e.g., increase weight_decay in optimizer.
-    # 3. Try reducing model complexity (fewer filters, smaller hidden sizes).
-    # 4. Add early stopping or make it more aggressive (lower patience/min_delta).
-    # 5. Increase dataset size or augment data if possible.
-
-    # BREAKTHROUGH CONFIG: Keep aggressive downsampling, slightly more capacity
     model_config = ShallowerConcatterConfig(
         model_name="ShallowerConcatter",
-        n_filters=[8, 16],  # gentle increase from 4,8
-        kernel_sizes=[(50, 2), (10, 5)],  # KEEP these - they work
-        strides=[(10, 5), (8, 4)],  # KEEP aggressive downsampling - this is KEY
-        raw_dropout_rate=0.70,  # reduce slightly from 0.75
+        n_filters=[16, 32],
+        kernel_sizes=[(40, 2), (8, 5)],
+        strides=[(12, 6), (10, 5)],
+        raw_dropout_rate=0.39811932916850734,
         paddings=[(5, 0), (1, 1)],
-        activation="silu",
+        activation="leaky_relu",
         n_spectral_features=16,
-        spectral_hidden_size=64,
-        spectral_dropout_rate=0.25,
-        concat_dropout_rate=0.50,  # reduce from 0.55
-        fusion_hidden_size=128,
-        gap_length=1,
+        spectral_hidden_size=128,
+        spectral_dropout_rate=0.2809098483832669,
+        concat_dropout_rate=0.5642264679590964,
+        fusion_hidden_size=256,
+        gap_length=4,
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=0.006,  # slightly higher initial LR
-        weight_decay=0.003,  # reduce L2 a bit to allow more learning
+        learning_rate=0.0036565664394494863,
+        weight_decay=0.00017060568872516544,
         use_cosine_annealing=True,
         cosine_annealing_t_0=10,
         cosine_annealing_t_mult=2,
@@ -63,7 +55,7 @@ if __name__ == "__main__":
 
     dataset_config = MultiDatasetConfig(
         h5_file_path=H5_FILE_PATH,
-        raw_normalization='sample-channel',  # per-sample normalization
+        raw_normalization='full',
         spectral_normalization='standard',
     )
 
@@ -72,10 +64,10 @@ if __name__ == "__main__":
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         random_seed=42,
-        batch_size=64,  # smaller batches = more gradient noise = regularization
-        max_epochs=100,  # allow longer training like spectral
-        patience=15,  # more patience
-        min_delta=0.0005,  # less aggressive stopping
+        batch_size=64,
+        max_epochs=100,
+        patience=15,
+        min_delta=0.0005,
         early_stopping_metric='loss',
         dataset_config=dataset_config,
         log_to_wandb=False,

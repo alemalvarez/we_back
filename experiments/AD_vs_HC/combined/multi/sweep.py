@@ -79,8 +79,8 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         criterion_config=criterion_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
         batch_size=int(cfg.get("batch_size", 32)),
-        max_epochs=50,
-        patience=5,
+        max_epochs=50, # here i just saw a run hit this limit. it should also go up.
+        patience=5, # im afraid this is too low. with shorter runs (smaller models), we might be able to afford at least 10.
         min_delta=0.001,
         early_stopping_metric="loss",
         dataset_config=MultiDatasetConfig(
