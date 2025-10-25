@@ -5,12 +5,12 @@ from core.schemas import (
     OptimizerConfig,
     CriterionConfig,
     RunConfig,
-    SpectralDatasetConfig,
+    MultiDatasetConfig,
 )
 from core.logging import make_logger
 from core.cv import run_cv
 
-from models.spectral_net import SpectralNetConfig
+from models.shallow_concatter import ShallowerConcatterConfig
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -33,10 +33,24 @@ def main() -> None:
 
     n_folds = 5
 
-    model_config = SpectralNetConfig()
+    model_config = ShallowerConcatterConfig(
+        model_name="ShallowerConcatter",
+        n_filters=[16, 32],
+        kernel_sizes=[(40, 2), (8, 5)],
+        strides=[(12, 6), (10, 5)],
+        raw_dropout_rate=0.39811932916850734,
+        paddings=[(5, 0), (1, 1)],
+        activation="leaky_relu",
+        n_spectral_features=16,
+        spectral_hidden_size=128,
+        spectral_dropout_rate=0.2809098483832669,
+        concat_dropout_rate=0.5642264679590964,
+        fusion_hidden_size=256,
+        gap_length=4,
+    )
     optimizer_config = OptimizerConfig(
-        learning_rate=3e-2,
-        weight_decay=None,
+        learning_rate=0.0036565664394494863,
+        weight_decay=0.00017060568872516544,
         use_cosine_annealing=True,
         cosine_annealing_t_0=5,
         cosine_annealing_t_mult=1,
@@ -47,8 +61,9 @@ def main() -> None:
         pos_weight_value=1.0,
     )
 
-    dataset_config = SpectralDatasetConfig(
+    dataset_config = MultiDatasetConfig(
         h5_file_path=h5_file_path,
+        raw_normalization='full',
         spectral_normalization='standard',
     )
 
