@@ -52,6 +52,9 @@ def main() -> None:
         concat_dropout_rate=0.5642264679590964,
         fusion_hidden_size=256,
         gap_length=4,
+        raw_norm_type="group",
+        spectral_norm_type="none",
+        fusion_norm_enabled=False,
     )
     optimizer_config = OptimizerConfig(
         learning_rate=0.0036565664394494863,

@@ -41,18 +41,21 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
 
     network_config = ShallowerConcatterConfig(
         model_name="ShallowerConcatter",
-        n_filters=n_filters,
-        kernel_sizes=kernels,
-        strides=strides,
+        n_filters=[16,32],
+        kernel_sizes=[(40, 2), (8, 5)],
+        strides=[(12, 6), (10, 5)],
         raw_dropout_rate=float(cfg.get("raw_dropout_rate", 0.25)),
-        paddings=paddings,
+        paddings=[(5, 0), (1, 1)],
         activation=cfg.get("activation", "silu"),
         n_spectral_features=16,
         spectral_hidden_size=int(cfg.get("spectral_hidden_size", 32)),
         concat_dropout_rate=float(cfg.get("concat_dropout_rate", 0.25)),
         spectral_dropout_rate=float(cfg.get("spectral_dropout_rate", 0.25)),
         fusion_hidden_size=int(cfg.get("fusion_hidden_size", 128)),
-        gap_length=int(cfg.get("gap_length", 1)),
+        gap_length=4,
+        raw_norm_type=cfg.get("raw_norm_type", "group"),
+        spectral_norm_type=cfg.get("spectral_norm_type", "none"),
+        fusion_norm_enabled=bool(cfg.get("fusion_norm_enabled", False)),
     )
 
     optimizer_config = OptimizerConfig(
@@ -79,8 +82,8 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         criterion_config=criterion_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
         batch_size=int(cfg.get("batch_size", 32)),
-        max_epochs=50, # here i just saw a run hit this limit. it should also go up.
-        patience=5, # im afraid this is too low. with shorter runs (smaller models), we might be able to afford at least 10.
+        max_epochs=75, # here i just saw a run hit this limit. it should also go up.
+        patience=8, # im afraid this is too low. with shorter runs (smaller models), we might be able to afford at least 10.
         min_delta=0.001,
         early_stopping_metric="loss",
         dataset_config=MultiDatasetConfig(

@@ -6,30 +6,6 @@ metric:
 run_cap: 100
 
 parameters:
-  n_filters:
-    values:
-      - "4_8"
-      - "8_16"
-      - "16_32"
-
-  kernel_sizes:
-    values:
-      - "40_2__8_5"
-      - "50_2__10_5"
-      - "60_2__12_5"
-
-  strides:
-    values:
-      - "8_4__6_3"
-      - "10_5__8_4"
-      - "12_6__10_5"
-
-  paddings:
-    values:
-      - "0_0__0_0"
-      - "5_0__1_1"
-      - "10_1__2_2"
-
   activation:
     values:
       - "silu"
@@ -49,26 +25,42 @@ parameters:
       - 128
       - 256
 
-  gap_length:
-    values:
-      - 1
-      - 2
-      - 4
-
   raw_dropout_rate:
     distribution: uniform
-    min: 0.1
+    min: 0.3
     max: 0.7
 
   spectral_dropout_rate:
     distribution: uniform
-    min: 0.1
-    max: 0.7
+    min: 0.0
+    max: 0.5
 
   concat_dropout_rate:
     distribution: uniform
     min: 0.1
     max: 0.7
+
+  raw_norm_type:
+    values:
+      - "group"
+      - "batch"
+
+  spectral_norm_type:
+    values:
+      - "batch"
+      - "group"
+      - "none"
+
+  fusion_norm_enabled:
+    values:
+      - true
+      - false
+
+  batch_size:
+    values:
+      - 32
+      - 64
+      - 128
 
   learning_rate:
     distribution: log_uniform_values
@@ -87,7 +79,6 @@ parameters:
       - sample
       - subject
       - channel
-      - full
 
 program: experiments.AD_vs_HC.combined.multi.sweep
 
