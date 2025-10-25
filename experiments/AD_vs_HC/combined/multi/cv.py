@@ -26,9 +26,14 @@ def main() -> None:
         "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5",
     )
 
-    splits_dir = "experiments/AD_vs_HC/combined/spectral/splits"
-    train_subjects_path = os.path.join(splits_dir, "training_subjects.txt")
-    val_subjects_path = os.path.join(splits_dir, "validation_subjects.txt")
+    train_subjects_path = os.getenv(
+        "TRAIN_SUBJECTS",
+        "experiments/AD_vs_HC/combined/multi/splits/training_subjects.txt",
+    )
+    val_subjects_path = os.getenv(
+        "VAL_SUBJECTS",
+        "experiments/AD_vs_HC/combined/multi/splits/validation_subjects.txt",
+    )
     all_subjects = _read_subjects(train_subjects_path) + _read_subjects(val_subjects_path)
 
     n_folds = 5
