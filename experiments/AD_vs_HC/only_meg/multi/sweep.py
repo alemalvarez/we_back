@@ -71,7 +71,7 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
 
     h5_file_path = os.getenv(
         "H5_FILE_PATH",
-        "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5",
+        "artifacts/only_meg_DK_features_only:v0/only_meg_DK_features_only.h5",
     )
 
     raw_norm_lit: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full'] = cfg.get("raw_normalization", "channel-subject")  # type: ignore
@@ -106,11 +106,11 @@ def main() -> None:
 
     train_subjects_path = os.getenv(
         "TRAIN_SUBJECTS",
-        "experiments/AD_vs_HC/combined/multi/splits/training_subjects.txt",
+        "experiments/AD_vs_HC/only_meg/multi/splits/training_subjects.txt",
     )
     val_subjects_path = os.getenv(
         "VAL_SUBJECTS",
-        "experiments/AD_vs_HC/combined/multi/splits/validation_subjects.txt",
+        "experiments/AD_vs_HC/only_meg/multi/splits/validation_subjects.txt",
     )
 
     all_subjects = _read_subjects(train_subjects_path) + _read_subjects(val_subjects_path)

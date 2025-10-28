@@ -684,16 +684,38 @@ if __name__ == "__main__":
     # )
 
     # Example 2: Mixed sources with per-folder is_eeg configuration
+    # creator.create_dataset(
+    #     data_sources=[
+    #         {"path": "/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/POCTEP", "is_eeg": True},
+    #         {"path": "/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH", "is_eeg": True},
+    #         {"path": "/Users/alemalvarez/code-workspace/TFG/DATA/MEG/DK", "is_eeg": False}
+    #     ],
+    #     output_path="megatest.h5",
+    #     include_raw=True,
+    #     include_psd=True,
+    #     include_features=True,
+    #     downsampling_freq=200,
+    #     category_whitelist = ['ADSEV', 'ADMIL', 'HC', 'AD', 'ADMOD']
+    # )
     creator.create_dataset(
         data_sources=[
-            {"path": "/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/POCTEP", "is_eeg": True},
-            {"path": "/Users/alemalvarez/code-workspace/TFG/DATA/BBDDs/HURH", "is_eeg": True},
-            {"path": "/Users/alemalvarez/code-workspace/TFG/DATA/MEG/DK", "is_eeg": False}
+            # eegs
+            {"path": r"E:\BBDDs\HURH\DK", "is_eeg": True},
+            {"path": r"E:\BBDDs\POCTEP\DK", "is_eeg": True},
+            # megs
+            {"path": r"E:\BBDDs\MEG\BrainDock\DK", "is_eeg": False},
+            {"path": r"E:\BBDDs\MEG\Control\DK", "is_eeg": False},
+            {"path": r"E:\BBDDs\MEG\Kakehashi\DK", "is_eeg": False},
+            {"path": r"E:\BBDDs\MEG\Kumagaya General\DK", "is_eeg": False},
+            {"path": r"E:\BBDDs\MEG\Kumagaya Monowasure\DK", "is_eeg": False},
+            {"path": r"E:\BBDDs\MEG\Mihara\DK", "is_eeg": False},
+            {"path": r"E:\BBDDs\MEG\Monowasure/\DK", "is_eeg": False}
+
         ],
         output_path="megatest.h5",
         include_raw=True,
         include_psd=True,
         include_features=True,
         downsampling_freq=200,
-        category_whitelist = ['ADSEV', 'ADMIL', 'HC', 'AD', 'ADMOD']
+        category_whitelist = ['ADSEV', 'ADMIL', 'HC', 'AD', 'ADMOD', 'MCI']
     )
