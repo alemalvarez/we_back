@@ -1,6 +1,5 @@
 import numpy as np
 from typing import List, Optional
-from loguru import logger
 
 def calcular_te(psd: np.ndarray, f: np.ndarray, banda: List[float], q_param: float) -> Optional[float]:
     """
@@ -31,8 +30,8 @@ def calcular_te(psd: np.ndarray, f: np.ndarray, banda: List[float], q_param: flo
                     o si 'banda' no está correctamente formateada o f_min > f_max.
     """
     EPSILON_Q_ONE = 1e-9
-    EPSILON_POWER = 1e-9
-    EPSILON_PDF_ZERO = 1e-9
+    EPSILON_POWER_RELATIVE = 1e-10  # Relative tolerance for zero power
+    EPSILON_PDF_ZERO = 1e-15  # Very small since PDF is normalized (unit-independent)
 
     # --- Input Validation ---
     if not isinstance(psd, np.ndarray):
@@ -75,23 +74,20 @@ def calcular_te(psd: np.ndarray, f: np.ndarray, banda: List[float], q_param: flo
     psd_banda_raw = psd[indbanda]
     psd_banda_valid = psd_banda_raw[~np.isnan(psd_banda_raw)]
 
-    logger.info(f"psd_banda_valid length: {psd_banda_valid.size}")
-
     if psd_banda_valid.size == 0:
         return None 
 
     # --- Cálculo de la Potencia Total y PDF ---
     potencia_total = np.sum(psd_banda_valid)
-    if potencia_total <= EPSILON_POWER:
+    max_psd = np.max(psd_banda_valid)
+    # Use relative threshold to handle different unit systems (EEG vs MEG)
+    if potencia_total <= max_psd * EPSILON_POWER_RELATIVE:
         return 0.0
 
     pdf = psd_banda_valid / potencia_total
     pdf_positive = pdf[pdf > EPSILON_PDF_ZERO]
     N_nz = pdf_positive.size
     N_total = psd_banda_valid.size
-
-    logger.info(f"N_nz: {N_nz}")
-    logger.info(f"N_total: {N_total}")
 
     # --- Cálculo de la Entropía de Tsallis Normalizada ---
     if N_nz <= 1:
@@ -107,9 +103,7 @@ def calcular_te(psd: np.ndarray, f: np.ndarray, banda: List[float], q_param: flo
     # O S_q_norm = 0 para N_nz=1 (caso ya cubierto).
     denominator_norm = 1.0 - N_total**(1.0 - q_param)
 
-    logger.info(f"denominator_norm: {denominator_norm}")
-
-    if abs(denominator_norm) < EPSILON_POWER: # Denominador es prácticamente cero
+    if abs(denominator_norm) < 1e-15: # Denominador es prácticamente cero
         # Esto debería ocurrir solo si N_nz^(1-q) es 1. 
         # Si N_nz > 1, esto implica 1-q = 0 => q=1, que ya está filtrado.
         # Si el numerador también es cero (como en el caso N_nz=1), el resultado es 0 (ya cubierto).
@@ -121,8 +115,6 @@ def calcular_te(psd: np.ndarray, f: np.ndarray, banda: List[float], q_param: flo
         return None 
         
     normalized_tsallis_entropy = numerator / denominator_norm
-
-    logger.info(f"normalized_tsallis_entropy: {normalized_tsallis_entropy}")
     
     return float(normalized_tsallis_entropy) 
 
@@ -141,8 +133,8 @@ def calcular_te_vector(psd: np.ndarray, f: np.ndarray, banda: List[float], q_par
         NaN values indicate invalid calculations.
     """
     EPSILON_Q_ONE = 1e-9
-    EPSILON_POWER = 1e-9
-    EPSILON_PDF_ZERO = 1e-9
+    EPSILON_POWER_RELATIVE = 1e-10  # Relative tolerance for zero power
+    EPSILON_PDF_ZERO = 1e-15  # Very small since PDF is normalized (unit-independent)
 
     # --- Input Validation ---
     if not isinstance(psd, np.ndarray):
@@ -196,7 +188,9 @@ def calcular_te_vector(psd: np.ndarray, f: np.ndarray, banda: List[float], q_par
             
         # Calculate total power
         potencia_total = np.sum(psd_valid)
-        if potencia_total <= EPSILON_POWER:
+        max_psd = np.max(psd_valid)
+        # Use relative threshold to handle different unit systems (EEG vs MEG)
+        if potencia_total <= max_psd * EPSILON_POWER_RELATIVE:
             results[i] = 0.0
             continue
             
@@ -215,7 +209,7 @@ def calcular_te_vector(psd: np.ndarray, f: np.ndarray, banda: List[float], q_par
             numerator = 1.0 - sum_pi_q
             denominator_norm = 1.0 - N_nz**(1.0 - q_param)
             
-            if abs(denominator_norm) < EPSILON_POWER:
+            if abs(denominator_norm) < 1e-15:
                 continue
                 
             normalized_tsallis_entropy = numerator / denominator_norm

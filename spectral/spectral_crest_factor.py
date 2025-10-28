@@ -79,9 +79,9 @@ def calcular_scf(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> Optional
     # Suma de PSD en banda (potencia total en la banda)
     sum_psd_banda = np.sum(psd_banda)
 
-    # Si la potencia total en la banda es cero o negativa.
-    # (PSD debería ser no-negativa, por lo que sum_psd_banda < 0 es anómalo).
-    if sum_psd_banda <= 1e-9: # Usar una pequeña tolerancia para comparar con cero
+    # Use relative threshold instead of absolute to handle different unit systems (EEG vs MEG)
+    # Check if power is essentially zero relative to the maximum value
+    if sum_psd_banda <= max_psd_banda * 1e-10: # Relative tolerance
         # Si sum_psd_banda es efectivamente 0 (y PSDs son non-negativos), todos los psd_banda son 0.
         # max_psd_banda es 0. mean_psd_banda es 0. SCF es 0/0 -> indefinido (NaN).
         print(
@@ -155,7 +155,8 @@ def calcular_scf_vector(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> n
         # Calculate total power in band
         sum_psd_banda = np.sum(psd_banda[i])
         
-        if sum_psd_banda <= 1e-9:  # Small threshold to avoid division by zero/noise
+        # Use relative threshold to handle different unit systems (EEG vs MEG)
+        if sum_psd_banda <= max_psd_banda * 1e-10:  # Relative threshold
             continue
             
         # Calculate mean PSD in band

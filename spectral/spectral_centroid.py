@@ -50,8 +50,10 @@ def calcular_sc(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> Optional[
 
     # Potencia total en la banda
     potencia_total_banda = np.sum(psd_banda)
+    max_psd_banda = np.max(psd_banda)
 
-    if potencia_total_banda <= 1e-9: # Umbral pequeño para evitar división por cero/ruido
+    # Use relative threshold to handle different unit systems (EEG vs MEG)
+    if potencia_total_banda <= max_psd_banda * 1e-10: # Relative threshold
         # print(f"Advertencia SC: La potencia total en la banda [{banda[0]}, {banda[1]}] es cero o insignificante.")
         # Si la potencia es cero, el centroide no está bien definido.
         # Podría devolverse el centro de la banda f_banda si f_banda no está vacío,
@@ -125,8 +127,10 @@ def calcular_sc_vector(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> np
     for i in range(n_segments):
         # Calculate total power in band
         potencia_total_banda = np.sum(psd_banda[i])
+        max_psd_banda = np.max(psd_banda[i])
         
-        if potencia_total_banda <= 1e-9:  # Small threshold to avoid division by zero/noise
+        # Use relative threshold to handle different unit systems (EEG vs MEG)
+        if potencia_total_banda <= max_psd_banda * 1e-10:  # Relative threshold
             continue
             
         # Calculate numerator: sum(f_i * PSD_i)

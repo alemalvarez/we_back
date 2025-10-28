@@ -1,6 +1,5 @@
 import numpy as np
 from typing import List, Optional
-from loguru import logger
 
 def calcular_se(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> Optional[float]:
     """
@@ -59,8 +58,6 @@ def calcular_se(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> Optional[
             f"f_min ({f_min}) no puede ser mayor que f_max ({f_max}) en 'banda'."
         )
 
-    print(f"Original PSD length: {len(psd)}")
-
     # --- Selección de la banda de frecuencia ---
     indbanda = np.where((f >= f_min) & (f <= f_max))[0]
 
@@ -69,8 +66,6 @@ def calcular_se(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> Optional[
         return None
 
     psd_banda_raw = psd[indbanda]
-
-    print(f"Band-filtered PSD length: {len(psd_banda_raw)}")
 
     # --- Filtrar NaNs de la PSD en la banda ---
     psd_banda_valid = psd_banda_raw[~np.isnan(psd_banda_raw)]
@@ -81,8 +76,10 @@ def calcular_se(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> Optional[
 
     # --- Cálculo de la Potencia Total y PDF ---
     potencia_total = np.sum(psd_banda_valid)
+    max_psd = np.max(psd_banda_valid)
 
-    if potencia_total <= 1e-9:  # Considerar potencia muy baja como cero
+    # Use relative threshold to handle different unit systems (EEG vs MEG)
+    if potencia_total <= max_psd * 1e-10:
         # print(f"Advertencia: Potencia total en banda [{f_min}, {f_max}] es cercana a cero.")
         # Si la potencia es cero, todos los p_i son cero (o indefinidos). Entropía podría ser 0.
         return 0.0 # O None, depending on convention for zero signal entropy
@@ -94,8 +91,8 @@ def calcular_se(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> Optional[
     # print(pdf[:50])
     
     # Filtrar elementos de PDF que son <= 0 para evitar log(0) o log(negativo)
-    # Usar una pequeña épsilon para la comparación.
-    pdf_positive = pdf[pdf > 1e-9]
+    # Use very small epsilon since PDF is normalized (unit-independent)
+    pdf_positive = pdf[pdf > 1e-15]
 
     if pdf_positive.size == 0:
         # Si no hay elementos positivos en la PDF (e.g., todo era ruido muy bajo o cero)
@@ -105,7 +102,6 @@ def calcular_se(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> Optional[
     # --- Cálculo de la Entropía de Shannon ---
     # H = - sum(p_i * log_e(p_i))
     shannon_entropy_sum = -np.sum(pdf_positive * np.log(pdf_positive))
-    logger.info(f"Shannon entropy pre normalized: {shannon_entropy_sum}")
 
     # --- Normalización de la Entropía ---
     # Normalizar por log_e(N), donde N es el número de puntos válidos en la banda.
@@ -122,8 +118,6 @@ def calcular_se(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> Optional[
     # Ya que el caso N=1 resulta en shannon_entropy_sum = 0, y se retorna 0.0 arriba,
     # no necesitamos una comprobación explícita de log_N == 0 aquí si N > 1.
     normalized_shannon_entropy = shannon_entropy_sum / np.log(N)
-    logger.info(f"we hare going to divide by {np.log(N)}, N is {N}")
-    logger.info(f"Shannon entropy post normalized: {normalized_shannon_entropy}")
     return float(normalized_shannon_entropy) 
 
 def calcular_se_vector(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> np.ndarray:
@@ -186,15 +180,17 @@ def calcular_se_vector(psd: np.ndarray, f: np.ndarray, banda: List[float]) -> np
             
         # Calculate total power
         potencia_total = np.sum(psd_valid)
-        if potencia_total <= 1e-9:
+        max_psd = np.max(psd_valid)
+        # Use relative threshold to handle different unit systems (EEG vs MEG)
+        if potencia_total <= max_psd * 1e-10:
             results[i] = 0.0
             continue
             
         # Calculate PDF
         pdf = psd_valid / potencia_total
         
-        # Filter positive PDF values
-        pdf_positive = pdf[pdf > 1e-9]
+        # Filter positive PDF values - use very small epsilon since PDF is normalized
+        pdf_positive = pdf[pdf > 1e-15]
         if pdf_positive.size == 0:
             results[i] = 0.0
             continue

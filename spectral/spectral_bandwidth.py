@@ -56,8 +56,10 @@ def calcular_sb(psd: np.ndarray, f: np.ndarray, banda: List[float], spectral_cen
 
     # Potencia total en la banda
     potencia_total_banda = np.sum(psd_banda)
+    max_psd_banda = np.max(psd_banda)
 
-    if potencia_total_banda <= 1e-9: # Evitar división por cero o valores muy pequeños
+    # Use relative threshold to handle different unit systems (EEG vs MEG)
+    if potencia_total_banda <= max_psd_banda * 1e-10: # Relative threshold
         print(f"Advertencia: La potencia total en la banda [{banda[0]}, {banda[1]}] es cero o insignificante.")
         # Si la potencia es cero, el ancho de banda es conceptualmente cero o indefinido.
         # Para consistencia con no poder calcular una media ponderada, devolver None o 0.
@@ -144,8 +146,10 @@ def calcular_sb_vector(psd: np.ndarray, f: np.ndarray, banda: List[float], spect
             
         # Calculate total power in band
         potencia_total_banda = np.sum(psd_banda[i])
+        max_psd_banda = np.max(psd_banda[i])
         
-        if potencia_total_banda <= 1e-9:  # Small threshold to avoid division by zero/noise
+        # Use relative threshold to handle different unit systems (EEG vs MEG)
+        if potencia_total_banda <= max_psd_banda * 1e-10:  # Relative threshold
             results[i] = 0.0 if f_banda.size > 0 else np.nan
             continue
             

@@ -31,7 +31,7 @@ def calcular_re(psd: np.ndarray, f: np.ndarray, banda: List[float], q_param: flo
                     o si 'banda' no está correctamente formateada o f_min > f_max.
     """
     EPSILON_Q_ONE = 1e-6  # More reasonable tolerance for q ≈ 1
-    EPSILON_POWER = 1e-12  # Stricter tolerance for zero power
+    EPSILON_POWER_RELATIVE = 1e-10  # Relative tolerance for zero power
 
     # --- Input Validation ---
     if not isinstance(psd, np.ndarray):
@@ -83,7 +83,9 @@ def calcular_re(psd: np.ndarray, f: np.ndarray, banda: List[float], q_param: flo
 
     # --- Cálculo de la Potencia Total y PDF ---
     potencia_total = np.sum(psd_banda_valid)
-    if potencia_total <= EPSILON_POWER:
+    max_psd = np.max(psd_banda_valid)
+    # Use relative threshold to handle different unit systems (EEG vs MEG)
+    if potencia_total <= max_psd * EPSILON_POWER_RELATIVE:
         return None
 
     pdf = psd_banda_valid / potencia_total
@@ -164,7 +166,7 @@ def calcular_re_vector(psd: np.ndarray, f: np.ndarray, banda: List[float], q_par
         NaN values indicate invalid calculations.
     """
     EPSILON_Q_ONE = 1e-6
-    EPSILON_POWER = 1e-12
+    EPSILON_POWER_RELATIVE = 1e-10  # Relative tolerance for zero power
 
     # --- Input Validation ---
     if not isinstance(psd, np.ndarray):
@@ -218,7 +220,9 @@ def calcular_re_vector(psd: np.ndarray, f: np.ndarray, banda: List[float], q_par
             
         # Calculate total power
         potencia_total = np.sum(psd_valid)
-        if potencia_total <= EPSILON_POWER:
+        max_psd = np.max(psd_valid)
+        # Use relative threshold to handle different unit systems (EEG vs MEG)
+        if potencia_total <= max_psd * EPSILON_POWER_RELATIVE:
             continue
             
         # Calculate PDF
