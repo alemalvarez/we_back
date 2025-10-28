@@ -1,4 +1,4 @@
-name: multi-shallow-sweep
+name: looking-for-stability
 method: bayes
 metric:
   name: cv/segment_level_final_f1_mean

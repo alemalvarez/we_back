@@ -38,6 +38,9 @@ class Subject:
     # Identifying information
     category: str
     file_origin: str
+    source_folder: str
+    folder_id: str
+    is_eeg: bool
 
     # Data information
     sampling_rate: int
@@ -56,6 +59,9 @@ class Subject:
             f"Subject(\n"
             f"  category: {self.category}\n"
             f"  file_origin: {self.file_origin}\n"
+            f"  source_folder: {self.source_folder}\n"
+            f"  folder_id: {self.folder_id}\n"
+            f"  is_eeg: {self.is_eeg}\n"
             f"  sampling_rate: {self.sampling_rate} Hz\n"
             f"  n_segments: {self.n_segments}\n"
             f"  filtering: {self.filtering}\n"

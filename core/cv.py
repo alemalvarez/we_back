@@ -136,7 +136,7 @@ def run_cv(
 
     # Use StratifiedKFold for proper stratified splitting by category
     labels = [_subject_type(sid) for sid in all_subjects]
-    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
+    skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=run_config.random_seed)
 
     folds: List[List[str]] = []
     for _, test_idx in skf.split(all_subjects, labels):
