@@ -54,7 +54,7 @@ if __name__ == "__main__":
         max_epochs=50,
         patience=5,
         min_delta=0.001,
-        early_stopping_metric='mcc',
+        early_stopping_metric='loss',
         dataset_config=dataset_config,
         log_to_wandb=False,
     )

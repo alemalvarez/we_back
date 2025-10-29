@@ -16,9 +16,9 @@ class SpectralDataset(Dataset):
             self.subject_ids = subjects_list
         else:
             assert subjects_txt_path is not None, "subjects_txt_path must be provided if subjects_list is not provided"
-            logger.info(f"Loading features dataset from {h5_file_path} with {len(subjects_txt_path)} subjects")
             with open(subjects_txt_path, 'r') as f:
                 self.subject_ids = [line.strip() for line in f.readlines()]
+            logger.info(f"Loading features dataset from {h5_file_path} with {len(self.subject_ids)} subjects")
 
         features_list = []
         labels_list = []

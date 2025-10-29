@@ -22,12 +22,10 @@ def _read_subjects(path: str) -> List[str]:
 def main() -> None:
     h5_file_path = os.getenv(
         "H5_FILE_PATH",
-        "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5",
+        "artifacts/only_meg_DK_features_only:v0/only_meg_DK_features_only.h5",
     )
 
-    h5_file_path = "harmonized_raw_features.h5"
-
-    splits_dir = "experiments/AD_vs_HC/combined/spectral/splits"
+    splits_dir = "experiments/AD_vs_HC/only_meg/spectral/splits"
     train_subjects_path = os.path.join(splits_dir, "training_subjects.txt")
     val_subjects_path = os.path.join(splits_dir, "validation_subjects.txt")
     all_subjects = _read_subjects(train_subjects_path) + _read_subjects(val_subjects_path)
@@ -37,22 +35,19 @@ def main() -> None:
     model_config = AdvancedSpectralNetConfig(
         model_name="AdvancedSpectralNet",
         input_size=16,
-        hidden_1_size=16,
-        hidden_2_size=32,
+        hidden_1_size=32,
+        hidden_2_size=16,
         dropout_rate=0.5,
         add_batch_norm=True,
         activation="relu",
     )
     optimizer_config = OptimizerConfig(
-        learning_rate=0.0061101875184043,
-        weight_decay=6.227019985574894e-06,
-        use_cosine_annealing=True,
-        cosine_annealing_t_0=5,
-        cosine_annealing_t_mult=1,
-        cosine_annealing_eta_min=1e-6,
+        learning_rate=0.003111076215981144,
+        weight_decay=0.00027819671966625116,
+        use_cosine_annealing=False,
     )
     criterion_config = CriterionConfig(
-        pos_weight_type='fixed',
+        pos_weight_type='multiplied',
         pos_weight_value=1.0,
     )
 
@@ -66,9 +61,9 @@ def main() -> None:
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         random_seed=42,
-        batch_size=64,
+        batch_size=32,
         max_epochs=50,
-        patience=20,
+        patience=10,
         min_delta=0.001,
         early_stopping_metric='loss',
         dataset_config=dataset_config,

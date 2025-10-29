@@ -215,8 +215,8 @@ def pretty_print_per_subject(per_subject: Optional[Dict[str, Dict[str, int]]], *
         return
 
     logger.info(title)
-    logger.info(f"{'Subject':<24}{'Correct':>10}{'Wrong':>10}{'Acc':>8}")
-    logger.info("-" * 52)
+    logger.info(f"{'Subject':<36}{'Correct':>10}{'Wrong':>10}{'Acc':>8}")
+    logger.info("-" * 64)
     # Stable order by subject id/name
     for subject in sorted(per_subject.keys()):
         counts = per_subject[subject]
@@ -225,8 +225,8 @@ def pretty_print_per_subject(per_subject: Optional[Dict[str, Dict[str, int]]], *
         total = max(correct + wrong, 1)
         acc = correct / total
         if acc > 0.5:
-            logger.success(f"{subject:<24}{correct:>10}{wrong:>10}{acc:>8.2f}")
+            logger.success(f"{subject:<36}{correct:>10}{wrong:>10}{acc:>8.2f}")
         else:
-            logger.info(f"{subject:<24}{correct:>10}{wrong:>10}{acc:>8.2f}")
+            logger.info(f"{subject:<36}{correct:>10}{wrong:>10}{acc:>8.2f}")
 
 

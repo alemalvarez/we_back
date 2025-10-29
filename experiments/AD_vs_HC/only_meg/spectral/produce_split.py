@@ -29,6 +29,7 @@ def load_dataset_info(h5_path: str) -> Tuple[Dict[str, List[str]], Dict[str, int
     """
     Load subject IDs and their categories from the H5 dataset.
     Only includes AD (positives), ADMIL (positives) and HC (negatives) for binary classification.
+    Filters for MEG data only (is_eeg = False).
 
     Args:
         h5_path: Path to the H5 file
@@ -40,7 +41,7 @@ def load_dataset_info(h5_path: str) -> Tuple[Dict[str, List[str]], Dict[str, int
     category_counts: Dict[str, int] = defaultdict(int)
 
     # Only include AD, ADMIL and HC categories
-    target_categories = {'ADMOD', 'HC', 'ADMIL'}
+    target_categories = {'ADMOD', 'HC', 'ADMIL', 'AD'}
 
     with h5py.File(h5_path, 'r') as f:
         if 'subjects' not in f:
@@ -52,8 +53,10 @@ def load_dataset_info(h5_path: str) -> Tuple[Dict[str, List[str]], Dict[str, int
             subject_group = subjects_group[subject_id]
             if 'category' in subject_group.attrs:
                 category = subject_group.attrs['category']
-                # Only include AD, ADMIL and HC subjects
-                if category in target_categories:
+                # Check if is_eeg flag exists and filter for MEG only (is_eeg = False)
+                is_eeg = subject_group.attrs.get('is_eeg', False)
+                # Only include AD, ADMIL and HC subjects that are MEG (not EEG)
+                if category in target_categories and not is_eeg:
                     subjects_by_category[category].append(subject_id)
                     category_counts[category] += 1
 

@@ -64,8 +64,15 @@ def load_h5_to_dataframe(h5_path: str) -> pd.DataFrame:
                         col_name = f"{feat}_{j}"
                         data_dict[col_name] = data[:, j]
 
+            # Get category from H5 attributes (more reliable)
+            category = subj_group.attrs.get('category', '')
+            
+            # Get origin from folder_id attribute if available
+            folder_id = subj_group.attrs.get('folder_id', '')
+            is_eeg = subj_group.attrs.get('is_eeg', True)
+            
+            # Extract ID from subject key for backwards compatibility
             match = re.match(r"([^_]+)_([^\.]+)\.mat", subj_key)
-            category = match.group(1) if match else ""
             subj_id = match.group(2) if match else ""
 
             subj_df = pd.DataFrame(data_dict)
@@ -73,11 +80,11 @@ def load_h5_to_dataframe(h5_path: str) -> pd.DataFrame:
             subj_df.insert(0, "Subject", subj_key)
             subj_df.insert(1, "category", category)
             subj_df.insert(2, "ID", subj_id)
+            subj_df.insert(3, "is_eeg", is_eeg)
 
-            if subj_id.endswith("ES") or subj_id.endswith("PT"):
-                origin_val = "POCTEP"
-            else:
-                origin_val = "HURH"
+            # Use folder_id as origin (e.g., "POCTEP", "HURH", "DK")
+            # This properly distinguishes MEG databases from EEG databases
+            origin_val = folder_id if folder_id else ("POCTEP" if subj_id.endswith(("ES", "PT")) else "HURH")
             subj_df["origin"] = origin_val
 
             all_subjects_data.append(subj_df)
@@ -99,15 +106,23 @@ def apply_harmonization(df: pd.DataFrame) -> pd.DataFrame:
 
     # Feature columns (exclude label columns)
     feature_cols = [col for col in df_harmonized.columns
-                    if col not in ["category", "category_binary", "ID", "origin", "Subject", "Segment"]]
+                    if col not in ["category", "category_binary", "ID", "origin", "Subject", "Segment", "is_eeg"]]
 
     for db in df_harmonized["origin"].unique():
         mask_db = df_harmonized["origin"] == db
         mask_controls = mask_db & (df_harmonized["category_binary"] == "NEGATIVE")
         controls = df_harmonized.loc[mask_controls, feature_cols]
 
+        if controls.empty:
+            print(f"WARNING: No control subjects found for origin '{db}'. Skipping harmonization for this database.")
+            continue
+
         mean_ctrl = controls.mean()
         std_ctrl = controls.std()
+        
+        # Handle features with zero standard deviation (constant values)
+        # Replace std=0 with 1 to avoid division by zero (these features won't be normalized)
+        std_ctrl = std_ctrl.replace(0, 1)
 
         normalized_vals = (
             df_harmonized.loc[mask_db, feature_cols].astype(float) - mean_ctrl

@@ -11,6 +11,7 @@ from sklearn.metrics import (  # type: ignore
     roc_auc_score,
     confusion_matrix,
     matthews_corrcoef,
+    cohen_kappa_score,
 )
 
 from core.builders import build_dataset
@@ -63,7 +64,7 @@ def _compute_subject_level_metrics(
         wrong = counts.get("wrong", 0)
         
         # True label: 0 for HC, 1 for AD (ADMIL or ADMOD)
-        true_label = 0 if subject.startswith("HC") else 1
+        true_label = 0 if "HC" in subject else 1
         
         # Predicted label: majority vote
         # If majority of segments match the true label, predict true label
@@ -92,6 +93,7 @@ def _compute_subject_level_metrics(
         "cv/subject_level_precision": float(precision_score(y_true_np, y_pred_np, zero_division=0)),
         "cv/subject_level_recall": float(recall_score(y_true_np, y_pred_np, zero_division=0)),
         "cv/subject_level_mcc": float(matthews_corrcoef(y_true_np, y_pred_np)),
+        "cv/subject_level_kappa": float(cohen_kappa_score(y_true_np, y_pred_np)),
     }
     
     # ROC AUC requires probabilities/confidence scores

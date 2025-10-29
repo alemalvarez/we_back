@@ -46,7 +46,7 @@ def run(
 
     device = _get_device()
 
-    train_loader = DataLoader(training_dataset, batch_size=config.batch_size, shuffle=True, pin_memory=True)
+    train_loader = DataLoader(training_dataset, batch_size=config.batch_size, shuffle=True, pin_memory=True, drop_last=True)
     validation_loader = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 
     model = build_model(config.network_config)
