@@ -25,7 +25,7 @@ def main() -> None:
         "artifacts/only_meg_DK_features_only:v0/only_meg_DK_features_only.h5",
     )
 
-    splits_dir = "experiments/AD_vs_HC/only_meg/spectral/splits"
+    splits_dir = "experiments/AD_vs_HC/everything/spectral/splits"
     train_subjects_path = os.path.join(splits_dir, "training_subjects.txt")
     val_subjects_path = os.path.join(splits_dir, "validation_subjects.txt")
     all_subjects = _read_subjects(train_subjects_path) + _read_subjects(val_subjects_path)
@@ -67,7 +67,7 @@ def main() -> None:
         min_delta=0.001,
         early_stopping_metric='loss',
         dataset_config=dataset_config,
-        log_to_wandb=False,
+        log_to_wandb=True,
         wandb_init=None,
     )
 

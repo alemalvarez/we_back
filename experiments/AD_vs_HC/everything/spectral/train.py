@@ -62,13 +62,13 @@ if __name__ == "__main__":
     
     training_dataset = build_dataset(
         dataset_config,
-        subjects_path="experiments/AD_vs_HC/only_meg/spectral/splits/training_subjects.txt",
+        subjects_path="experiments/AD_vs_HC/everything/spectral/splits/training_subjects.txt",
         validation=False
     )
 
     validation_dataset = build_dataset(
         dataset_config,
-        subjects_path="experiments/AD_vs_HC/only_meg/spectral/splits/validation_subjects.txt",
+        subjects_path="experiments/AD_vs_HC/everything/spectral/splits/validation_subjects.txt",
         validation=True
     )
 

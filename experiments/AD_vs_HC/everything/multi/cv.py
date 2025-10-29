@@ -28,11 +28,11 @@ def main() -> None:
 
     train_subjects_path = os.getenv(
         "TRAIN_SUBJECTS",
-        "experiments/AD_vs_HC/only_meg/multi/splits/training_subjects.txt",
+        "experiments/AD_vs_HC/everything/multi/splits/training_subjects.txt",
     )
     val_subjects_path = os.getenv(
         "VAL_SUBJECTS",
-        "experiments/AD_vs_HC/only_meg/multi/splits/validation_subjects.txt",
+        "experiments/AD_vs_HC/everything/multi/splits/validation_subjects.txt",
     )
     all_subjects = _read_subjects(train_subjects_path) + _read_subjects(val_subjects_path)
 
