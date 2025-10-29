@@ -107,7 +107,7 @@ def _compute_subject_level_metrics(
             total = correct + wrong
             
             # True label: 0 for HC, 1 for AD
-            true_label = 0 if subject.startswith("HC") else 1
+            true_label = 0 if 'HC' in subject else 1
             
             # Proportion of segments that predicted AD
             if true_label == 1:
