@@ -40,24 +40,22 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
     )
     dataset_config = SpectralDatasetConfig(
         h5_file_path=H5_FILE_PATH,
-        dataset_names=["hurh", "poctep"],
-        spectral_normalization='standard',
+        dataset_names=["poctep"],
+        spectral_normalization="standard",
     )
     run_config = RunConfig(
         network_config=model_config,
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         dataset_config=dataset_config,
-        random_seed=42,
+        random_seed=int(os.getenv("RANDOM_SEED", 42)),
         batch_size=int(cfg.get("batch_size", 32)),
         max_epochs=50,
         patience=10,
         min_delta=0.001,
         early_stopping_metric='loss',
         log_to_wandb=True,
-        wandb_init={
-            "project": "test-da-framework",
-        },
+        wandb_init=None
     )
     return run_config
 
