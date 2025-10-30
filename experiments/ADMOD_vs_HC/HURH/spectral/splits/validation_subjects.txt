@@ -1,7 +1,0 @@
-HC_178.mat
-HC_194.mat
-HC_199.mat
-HC_202.mat
-HC_210.mat
-HC_228.mat
-HC_241.mat

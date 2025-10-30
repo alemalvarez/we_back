@@ -175,6 +175,7 @@ class CriterionConfig(WarnUnsetDefaultsModel):
 
 class DatasetConfig(WarnUnsetDefaultsModel):
     h5_file_path: str
+    dataset_names: list[str]
 
 class SpectralDatasetConfig(DatasetConfig):
     dataset_type: Literal['spectral'] = 'spectral'

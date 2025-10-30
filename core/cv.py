@@ -27,16 +27,18 @@ load_dotenv()
 
 
 def _subject_type(subject_id: str) -> str:
-    if subject_id.startswith("ADMIL"):
+    if "ADMIL" in subject_id:
         return "ADMIL"
-    elif subject_id.startswith("ADMOD"):
+    elif "ADMOD" in subject_id:
         return "ADMOD"
-    elif subject_id.startswith("HC"):
+    elif "HC" in subject_id:
         return "HC"
+    elif "AD" in subject_id:
+        return "AD"
     return "UNKNOWN"
 
 def _count_by_category(subjects: List[str]) -> dict[str, int]:
-    counts = {"ADMIL": 0, "ADMOD": 0, "HC": 0}
+    counts = {"ADMIL": 0, "ADMOD": 0, "HC": 0, "AD": 0}
     for subject in subjects:
         category = _subject_type(subject)
         if category in counts:
@@ -166,9 +168,6 @@ def run_cv(
         magic_logger.log_metrics({
             f"{fold_prefix}/train_subjects": len(train_fold),
             f"{fold_prefix}/val_subjects": len(val_fold),
-            f"{fold_prefix}/admil_count": val_counts["ADMIL"],
-            f"{fold_prefix}/admod_count": val_counts["ADMOD"],
-            f"{fold_prefix}/hc_count": val_counts["HC"],
         })
 
         training_dataset = build_dataset(
@@ -220,7 +219,6 @@ def run_cv(
                         f"Stopping CV early."
                     )
                     magic_logger.log_metrics({
-                        "cv/early_stopped": True,
                         "cv/early_stopped_at_fold": fold_idx + 1,
                         "cv/early_stopped_mcc": fold_mcc,
                     })
@@ -231,8 +229,7 @@ def run_cv(
             logger.info("=" * 40 + f" FOLD {fold_idx+1} DONE" + "=" * 40)
 
     keys = [
-        "final_accuracy", "final_f1", "final_precision", "final_recall", "final_mcc", "final_roc_auc", "final_loss",
-        "final_tn", "final_fp", "final_fn", "final_tp", "final_kappa"
+        "final_accuracy", "final_f1", "final_precision", "final_recall", "final_mcc", "final_roc_auc", "final_kappa"
     ]
     # Compute and log CV summary metrics
     cv_summary_metrics = {}

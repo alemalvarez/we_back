@@ -14,7 +14,6 @@ from sklearn.metrics import (  # type: ignore
     recall_score,
     roc_auc_score,
     precision_recall_curve,
-    confusion_matrix,
     matthews_corrcoef,
     cohen_kappa_score,
 )
@@ -113,8 +112,6 @@ def evaluate_dataset(
 
     # Average loss if available
     metrics: dict[str, float] = {}
-    if criterion is not None:
-        metrics[f"{prefix}/final_loss"] = total_loss / max(len(loader), 1)
 
     # ROC AUC over probabilities
     try:
@@ -138,12 +135,6 @@ def evaluate_dataset(
         best_threshold = float(thresholds[best_idx])
 
     y_pred = (y_pred_proba > best_threshold).astype(int)
-
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    metrics[f"{prefix}/final_tn"] = float(tn)
-    metrics[f"{prefix}/final_fp"] = float(fp)
-    metrics[f"{prefix}/final_fn"] = float(fn)
-    metrics[f"{prefix}/final_tp"] = float(tp)
 
     metrics[f"{prefix}/final_accuracy"] = float(accuracy_score(y_true, y_pred))
     metrics[f"{prefix}/final_f1"] = float(f1_score(y_true, y_pred))
