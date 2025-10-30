@@ -1,5 +1,5 @@
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing_extensions import Type, TypeVar
 import numpy as np
 from typing import Optional, Tuple, Dict, Any
