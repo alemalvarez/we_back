@@ -1,6 +1,7 @@
 import json
 import os
 from dotenv import load_dotenv
+import wandb
 
 from core.schemas import SpectralDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
 from models.spectral_net import AdvancedSpectralNetConfig
@@ -18,19 +19,19 @@ def _read_subjects(path: str, dataset_name: str) -> list[str]:
         splits = json.load(f)
         return splits[dataset_name]["cv_subjects"]
 
-def main() -> None:
+def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore[name-defined]
     model_config = AdvancedSpectralNetConfig(
         model_name="AdvancedSpectralNet",
         input_size=16,
-        hidden_1_size=32,
-        hidden_2_size=16,
-        dropout_rate=0.5,
+        hidden_1_size=int(cfg.get("hidden_1_size", 16)),
+        hidden_2_size=int(cfg.get("hidden_2_size", 32)),
+        dropout_rate=float(cfg.get("dropout_rate", 0.5)),
         add_batch_norm=True,
-        activation="relu",
+        activation=cfg.get("activation", "relu"),
     )
     optimizer_config = OptimizerConfig(
-        learning_rate=0.003111076215981144,
-        weight_decay=0.00027819671966625116,
+        learning_rate=float(cfg.get("learning_rate", 0.003111076215981144)),
+        weight_decay=float(cfg.get("weight_decay", 0.0)) if cfg.get("weight_decay") is not None else None,
         use_cosine_annealing=False,
     )
     criterion_config = CriterionConfig(
@@ -48,22 +49,31 @@ def main() -> None:
         criterion_config=criterion_config,
         dataset_config=dataset_config,
         random_seed=42,
-        batch_size=32,
+        batch_size=int(cfg.get("batch_size", 32)),
         max_epochs=50,
         patience=10,
         min_delta=0.001,
         early_stopping_metric='loss',
-        log_to_wandb=False,
+        log_to_wandb=True,
         wandb_init={
             "project": "test-da-framework",
         },
     )
+    return run_config
 
+def main() -> None:
+    # Expect a W&B agent to have initialized the run; otherwise, init minimally
+    if wandb.run is None:
+        wandb.init(project=os.getenv("WANDB_PROJECT", "AD_vs_HC"))
+
+    cfg = wandb.config
+
+    run_config = build_run_config_from_wandb(cfg)
     magic_logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)
-    magic_logger.log_params(run_config.model_dump(mode='python'))
+    magic_logger.log_params(run_config.model_dump())
 
     all_subjects = []
-    for dataset_name in dataset_config.dataset_names:
+    for dataset_name in run_config.dataset_config.dataset_names:
         all_subjects.extend(_read_subjects(SPLITS_JSON_PATH, dataset_name))
 
     run_cv(
@@ -71,8 +81,10 @@ def main() -> None:
         n_folds=N_FOLDS,
         run_config=run_config,
         magic_logger=magic_logger,   
-        min_fold_mcc=.15,
+        min_fold_mcc=.30,
     )
+
+    magic_logger.finish()
 
 if __name__ == "__main__":
     main()

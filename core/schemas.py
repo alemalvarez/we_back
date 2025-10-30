@@ -2,10 +2,10 @@
 from dataclasses import dataclass
 from typing_extensions import Type, TypeVar
 import numpy as np
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, Union, Annotated, TYPE_CHECKING
 from loguru import logger
 from typing import Literal
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, Field, model_serializer
 
 class _UnsetSentinel:
     pass
@@ -209,7 +209,7 @@ class RunConfig(WarnUnsetDefaultsModel):
     network_config: NetworkConfig
     optimizer_config: OptimizerConfig
     criterion_config: CriterionConfig
-    dataset_config: DatasetConfig
+    dataset_config: Union[SpectralDatasetConfig, RawDatasetConfig, MultiDatasetConfig]
     random_seed: int
     batch_size: int
     max_epochs: int
@@ -218,6 +218,25 @@ class RunConfig(WarnUnsetDefaultsModel):
     early_stopping_metric: Optional[Literal['loss', 'f1', 'mcc', 'kappa']] = 'loss' # loss is generaly recommended.
     log_to_wandb: bool = False
     wandb_init: Optional[dict] = None
+    
+    @model_serializer(mode='wrap')
+    def _serialize_with_actual_types(self, serializer, info):
+        """Serialize nested configs using their actual runtime types instead of declared types."""
+        # Get the default serialization
+        data = serializer(self)
+        
+        # Re-serialize nested configs to include all their fields
+        if isinstance(data, dict):
+            if isinstance(self.network_config, WarnUnsetDefaultsModel):
+                data['network_config'] = self.network_config.model_dump(mode=info.mode if info else 'python')
+            if isinstance(self.optimizer_config, WarnUnsetDefaultsModel):
+                data['optimizer_config'] = self.optimizer_config.model_dump(mode=info.mode if info else 'python')
+            if isinstance(self.criterion_config, WarnUnsetDefaultsModel):
+                data['criterion_config'] = self.criterion_config.model_dump(mode=info.mode if info else 'python')
+            if isinstance(self.dataset_config, WarnUnsetDefaultsModel):
+                data['dataset_config'] = self.dataset_config.model_dump(mode=info.mode if info else 'python')
+        
+        return data
 
     @model_validator(mode="after")
     def _print_config_summary(self):
