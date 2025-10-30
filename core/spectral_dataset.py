@@ -106,7 +106,6 @@ class SpectralDataset(Dataset):
                     spectral_mean=mean_vals.numpy(),
                     spectral_std=std_vals.numpy()
                 )
-                logger.info(f"Norm stats: {self.norm_stats}")
         else:
             self.norm_stats = None
 
