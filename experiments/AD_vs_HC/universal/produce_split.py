@@ -25,9 +25,9 @@ load_dotenv()
 # ============================================================================
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5")
-DATASET_NAME = "eeg"  # Unique name for this dataset configuration
-FOLDER_IDS = ["HURH", "POCTEP"]  # List of folder_ids to include
-CATEGORIES = ["HC", "ADMIL", "ADMOD"]  # List of categories to include
+DATASET_NAME = "meg"  # Unique name for this dataset configuration
+FOLDER_IDS = ["BrainDock", "Control", "Kakehashi", "Kumagaya General", "Kumagaya Monowasure", "Mihara", "Monowasure"]  # List of folder_ids to include
+CATEGORIES = ["HC", "AD"]  # List of categories to include
 TEST_RATIO = 0.15  # Proportion for test set (rest goes to CV)
 RANDOM_STATE = int(os.getenv("RANDOM_SEED", "42"))
 OUTPUT_JSON = "universal_splits.json"  # Path relative to this script's directory
