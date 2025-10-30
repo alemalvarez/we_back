@@ -3,13 +3,17 @@ import h5py  # type: ignore
 import torch
 from typing import Literal, List, Optional
 from loguru import logger
+from core.schemas import NormalizationStats
 
 class SpectralDataset(Dataset):
+    norm_stats: Optional[NormalizationStats]
+    
     def __init__(self, 
     h5_file_path: str, 
     subjects_txt_path: Optional[str] = None,
     normalize: Literal['min-max', 'standard', 'none'] = 'none',
     subjects_list: Optional[List[str]] = None,
+    norm_stats: Optional[NormalizationStats] = None,
     ):
         if subjects_list:
             logger.info(f"Using provided subjects_list with {len(subjects_list)} subjects")
@@ -68,13 +72,43 @@ class SpectralDataset(Dataset):
         logger.debug(f"Std before normalization: {self.features.std()}")
 
         if normalize == 'min-max':
-            min_vals = self.features.min(dim=0, keepdim=True).values
-            max_vals = self.features.max(dim=0, keepdim=True).values
-            self.features = (self.features - min_vals) / (max_vals - min_vals)
+            if norm_stats is not None and norm_stats.spectral_mean is not None and norm_stats.spectral_std is not None:
+                # Use provided stats (treating them as min/max)
+                logger.info("Using provided normalization stats for min-max")
+                min_vals = torch.from_numpy(norm_stats.spectral_mean)
+                max_vals = torch.from_numpy(norm_stats.spectral_std)
+                self.features = (self.features - min_vals) / (max_vals - min_vals)
+                self.norm_stats = norm_stats
+            else:
+                # Compute stats
+                min_vals = self.features.min(dim=0, keepdim=True).values
+                max_vals = self.features.max(dim=0, keepdim=True).values
+                self.features = (self.features - min_vals) / (max_vals - min_vals)
+                self.norm_stats = NormalizationStats(
+                    spectral_mean=min_vals.numpy(),
+                    spectral_std=max_vals.numpy()
+                )
         elif normalize == 'standard':
-            mean_vals = self.features.mean(dim=0, keepdim=True)
-            std_vals = self.features.std(dim=0, keepdim=True)
-            self.features = (self.features - mean_vals) / std_vals
+            if norm_stats is not None and norm_stats.spectral_mean is not None and norm_stats.spectral_std is not None:
+                # Use provided stats
+                logger.info("Using provided normalization stats for standard")
+                mean_vals = torch.from_numpy(norm_stats.spectral_mean)
+                std_vals = torch.from_numpy(norm_stats.spectral_std)
+                self.features = (self.features - mean_vals) / std_vals
+                self.norm_stats = norm_stats
+            else:
+                # Compute stats
+                mean_vals = self.features.mean(dim=0, keepdim=True)
+                std_vals = self.features.std(dim=0, keepdim=True)
+                logger.info("Computing stats for standard normalization")
+                self.features = (self.features - mean_vals) / std_vals
+                self.norm_stats = NormalizationStats(
+                    spectral_mean=mean_vals.numpy(),
+                    spectral_std=std_vals.numpy()
+                )
+                logger.info(f"Norm stats: {self.norm_stats}")
+        else:
+            self.norm_stats = None
 
         logger.debug(f"Mean after normalization: {self.features.mean()}")
         logger.debug(f"Std after normalization: {self.features.std()}")

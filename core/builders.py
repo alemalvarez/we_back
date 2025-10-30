@@ -4,7 +4,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import Dataset
 from core.multi_dataset import MultiDataset
-from core.schemas import NetworkConfig, OptimizerConfig, CriterionConfig, DatasetConfig, SpectralDatasetConfig, RawDatasetConfig, MultiDatasetConfig
+from core.schemas import NetworkConfig, OptimizerConfig, CriterionConfig, DatasetConfig, SpectralDatasetConfig, RawDatasetConfig, MultiDatasetConfig, NormalizationStats
 from models.concatter import Concatter, GatedConcatter, SimpleConcatter
 from models.simple_2d import Simple2D3Layers, DeeperCustom, Deeper2D, Improved2D
 from models.spectral_net import SpectralNet
@@ -49,13 +49,20 @@ def build_criterion(config: CriterionConfig, dataset_pos_neg: tuple[int, int]) -
         pos_weight = config.pos_weight_value * (dataset_pos_neg[0] / dataset_pos_neg[1])
         return nn.BCEWithLogitsLoss(pos_weight=torch.tensor(pos_weight))
 
-def build_dataset(config: DatasetConfig, subjects_path: Optional[str] = None, subjects_list: Optional[List[str]] = None, validation: bool = False) -> Dataset:
+def build_dataset(
+    config: DatasetConfig, 
+    subjects_path: Optional[str] = None, 
+    subjects_list: Optional[List[str]] = None, 
+    validation: bool = False,
+    norm_stats: Optional[NormalizationStats] = None
+) -> Dataset:
     if isinstance(config, SpectralDatasetConfig):
         return SpectralDataset(
             config.h5_file_path,
             subjects_path,
             config.spectral_normalization,
-            subjects_list
+            subjects_list,
+            norm_stats
         )
     elif isinstance(config, MultiDatasetConfig):
         return MultiDataset(
@@ -63,7 +70,8 @@ def build_dataset(config: DatasetConfig, subjects_path: Optional[str] = None, su
             subjects_path,
             config.raw_normalization,
             config.spectral_normalization,
-            subjects_list
+            subjects_list,
+            norm_stats
         )
     else:
         assert isinstance(config, RawDatasetConfig)
@@ -75,7 +83,8 @@ def build_dataset(config: DatasetConfig, subjects_path: Optional[str] = None, su
                 augment=False,
                 augment_prob=config.augment_prob,
                 noise_std=config.noise_std,
-                subjects_list=subjects_list
+                subjects_list=subjects_list,
+                norm_stats=norm_stats
             )
         else:
             return RawDataset(
@@ -85,5 +94,6 @@ def build_dataset(config: DatasetConfig, subjects_path: Optional[str] = None, su
                 augment=config.augment,
                 augment_prob=config.augment_prob,
                 noise_std=config.noise_std,
-                subjects_list=subjects_list
+                subjects_list=subjects_list,
+                norm_stats=norm_stats
             )

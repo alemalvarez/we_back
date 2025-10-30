@@ -41,6 +41,7 @@ def main() -> None:
     dataset_config = SpectralDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=["hurh", "poctep"],
+        spectral_normalization='standard',
     )
     run_config = RunConfig(
         network_config=model_config,

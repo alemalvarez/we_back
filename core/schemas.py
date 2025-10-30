@@ -1,5 +1,5 @@
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing_extensions import Type, TypeVar
 import numpy as np
 from typing import Optional, Tuple, Dict, Any
@@ -11,6 +11,17 @@ class _UnsetSentinel:
     pass
 
 _UNSET = _UnsetSentinel()
+
+@dataclass
+class NormalizationStats:
+    """Stores normalization statistics for sharing between train/val/test datasets."""
+    # For raw data: stores per-database, per-channel, or global stats
+    # Keys: ('dataset', folder_id, channel_idx) for channel-dataset/control-channel
+    #       ('dataset', folder_id) for dataset/control-global
+    raw_stats: Optional[Dict[Any, Tuple[float, float]]] = None
+    # For spectral data: stores mean/std vectors
+    spectral_mean: Optional[np.ndarray] = None
+    spectral_std: Optional[np.ndarray] = None
 
 @dataclass 
 class Subject:
@@ -183,14 +194,14 @@ class SpectralDatasetConfig(DatasetConfig):
 
 class RawDatasetConfig(DatasetConfig):
     dataset_type: Literal['raw'] = 'raw'
-    raw_normalization: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full'] = 'sample-channel'
+    raw_normalization: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel-dataset', 'dataset', 'control-channel', 'control-global'] = 'sample-channel'
     augment: bool = False
     augment_prob: Tuple[float, float] = (0.5, 0.0)
     noise_std: float = 0.1
 
 class MultiDatasetConfig(DatasetConfig):
     dataset_type: Literal['multi'] = 'multi'
-    raw_normalization: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel', 'full'] = 'sample-channel'
+    raw_normalization: Literal['sample-channel', 'sample', 'channel-subject', 'subject', 'channel-dataset', 'dataset', 'control-channel', 'control-global'] = 'sample-channel'
     spectral_normalization: Literal['min-max', 'standard', 'none'] = 'none'
 
 

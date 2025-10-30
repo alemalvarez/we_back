@@ -175,10 +175,15 @@ def run_cv(
             subjects_list=train_fold,
             validation=False
         )
+        
+        # Extract normalization stats from training dataset
+        train_norm_stats = getattr(training_dataset, 'norm_stats', None)
+        
         validation_dataset = build_dataset(
             run_config.dataset_config, 
             subjects_list=val_fold,
-            validation=True
+            validation=True,
+            norm_stats=train_norm_stats
         )
 
         trained_model = run_single(
