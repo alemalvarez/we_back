@@ -34,7 +34,7 @@ def main() -> None:
         use_cosine_annealing=False,
     )
     criterion_config = CriterionConfig(
-        pos_weight_type='fixed',
+        pos_weight_type='multiplied',
         pos_weight_value=1.0,
     )
     dataset_config = SpectralDatasetConfig(

@@ -2,8 +2,8 @@ import json
 import os
 from dotenv import load_dotenv
 
-from core.schemas import SpectralDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
-from models.spectral_net import AdvancedSpectralNetConfig
+from core.schemas import RawDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
+from models.simple_2d import DeeperCustomConfig
 from core.logging import make_logger
 from core.cv import run_cv
 
@@ -19,28 +19,34 @@ def _read_subjects(path: str, dataset_name: str) -> list[str]:
         return splits[dataset_name]["cv_subjects"]
 
 def main() -> None:
-    model_config = AdvancedSpectralNetConfig(
-        model_name="AdvancedSpectralNet",
-        input_size=16,
-        hidden_1_size=32,
-        hidden_2_size=16,
-        dropout_rate=0.5,
-        add_batch_norm=True,
+    model_config = DeeperCustomConfig(
+        model_name="DeeperCustom",
+        n_filters=[16, 32, 64, 128],
+        kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
+        strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
+        paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
         activation="relu",
+        dropout_before_activation=False,
+        dropout_rate=0.5,
     )
     optimizer_config = OptimizerConfig(
-        learning_rate=0.003111076215981144,
-        weight_decay=0.00027819671966625116,
-        use_cosine_annealing=False,
+        learning_rate=0.004255107493153422,
+        weight_decay=0.00005,
+        use_cosine_annealing=True,
+        cosine_annealing_t_0=7,
+        cosine_annealing_t_mult=2,
+        cosine_annealing_eta_min=1e-6,
     )
+
     criterion_config = CriterionConfig(
-        pos_weight_type='fixed',
+        pos_weight_type="multiplied",
         pos_weight_value=1.0,
     )
-    dataset_config = SpectralDatasetConfig(
+    dataset_config = RawDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=["hurh", "poctep"],
-        spectral_normalization='standard',
+        raw_normalization='channel-subject',
+        augment=False,
     )
     run_config = RunConfig(
         network_config=model_config,
