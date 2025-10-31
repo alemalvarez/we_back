@@ -6,7 +6,7 @@ from pydantic import model_validator
 from torch import nn
 import torch
 
-from core import validate_kernel
+from core.validate_kernel import validate_kernel
 from core.schemas import NetworkConfig
 
 
