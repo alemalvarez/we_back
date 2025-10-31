@@ -11,7 +11,7 @@ from models.spectral_net import SpectralNet
 from models.spectral_net import AdvancedSpectralNet
 from core.spectral_dataset import SpectralDataset
 from core.raw_dataset import RawDataset
-from models.squeezer import DeeperSE
+from models.squeezer import DeeperSE, FlexibleSE
 from models.shallow_concatter import ShallowerConcatter
 
 def build_model(config: NetworkConfig) -> nn.Module: 
@@ -26,6 +26,7 @@ def build_model(config: NetworkConfig) -> nn.Module:
         "GatedConcatter": GatedConcatter,
         "SimpleConcatter": SimpleConcatter,
         "DeeperSE": DeeperSE,
+        "FlexibleSE": FlexibleSE,
         "ShallowerConcatter": ShallowerConcatter,
     }
     return name_class_map[config.model_name](config)
