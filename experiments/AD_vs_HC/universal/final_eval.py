@@ -144,11 +144,23 @@ def train_and_evaluate(
         metric_prefix=f"train_{training_category}",
     )
     
-    logger.info("Training complete. Starting cross-domain evaluation...")
-    logger.info("=" * 100)
+    logger.info("Training complete. Determining optimal threshold on validation set...")
     
     # Device setup for evaluation
     device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+    
+    # Evaluate on validation set to get optimal threshold
+    val_result = evaluate_dataset(
+        model=trained_model,
+        dataset=validation_dataset,
+        device=device,
+        batch_size=run_config.batch_size,
+    )
+    optimal_threshold = val_result.best_threshold
+    logger.success(f"Optimal threshold from validation: {optimal_threshold:.4f}")
+    
+    logger.info("Starting cross-domain evaluation with fixed threshold...")
+    logger.info("=" * 100)
     
     # Evaluate on all test sets
     for test_category in CATEGORIES:
@@ -170,14 +182,15 @@ def train_and_evaluate(
             norm_stats=train_norm_stats,
         )
         
-        # Evaluate
+        # Evaluate with fixed threshold
         eval_result = evaluate_dataset(
             model=trained_model,
             dataset=test_dataset,
             device=device,
             batch_size=run_config.batch_size,
             logger_sink=magic_logger,
-            prefix=f"trained_{training_category}/test_{test_category}",
+            prefix=f"test_{test_category}",
+            fixed_threshold=optimal_threshold,
         )
         
         # Pretty print per-subject results
@@ -209,15 +222,15 @@ def main() -> None:
         model_name="AdvancedSpectralNet",
         input_size=16,
         hidden_1_size=32,
-        hidden_2_size=16,
-        dropout_rate=0.5,
+        hidden_2_size=128,
+        dropout_rate=0.41449970599196473,
         add_batch_norm=True,
-        activation="relu",
+        activation="gelu",
     )
     
     optimizer_config = OptimizerConfig(
-        learning_rate=0.003,
-        weight_decay=0.0003,
+        learning_rate=0.009996687976754293,
+        weight_decay=3.96278689021512e-05,
         use_cosine_annealing=False,
     )
     
@@ -254,7 +267,7 @@ def main() -> None:
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         dataset_config=dataset_config,
-        random_seed=42,
+        random_seed=int(os.getenv("RANDOM_SEED", 42)),
         batch_size=32,
         max_epochs=50,
         patience=10,
@@ -263,8 +276,7 @@ def main() -> None:
         log_to_wandb=True,
         wandb_init={
             "project": "AD_vs_HC_final_eval",
-            "name": f"train_{training_category}_spectral",
-            "tags": [training_category, "final_eval", "spectral"],
+            "run_name": f"train_on_{training_category}_spectral",
         },
     )
     
@@ -283,7 +295,7 @@ def main() -> None:
         training_category=training_category,
         run_config=run_config,
         magic_logger=magic_logger,
-        val_split=0.2,
+        val_split=0.15,
     )
     
     # Finish logging

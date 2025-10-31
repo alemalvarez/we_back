@@ -49,6 +49,7 @@ def evaluate_dataset(
     criterion: Optional[nn.Module] = None,
     logger_sink: Optional[Logger] = None,
     prefix: str = "val",
+    fixed_threshold: Optional[float] = None,
 
 ) -> EvaluationResult:
     """Run a comprehensive evaluation on a dataset.
@@ -65,6 +66,7 @@ def evaluate_dataset(
         criterion: Optional loss function to compute average loss.
         logger_sink: Optional logger to record scalar metrics.
         prefix: Metric name prefix (e.g., "val" or "test").
+        fixed_threshold: Optional fixed threshold to use instead of searching.
 
     Returns:
         EvaluationResult with a metrics mapping and the best threshold found.
@@ -119,20 +121,23 @@ def evaluate_dataset(
     except Exception:
         metrics[f"{prefix}/final_roc_auc"] = float("nan")
 
-    # Threshold search using MCC as objective
-    precisions, recalls, thresholds = precision_recall_curve(y_true, y_pred_proba)
-    if thresholds.size == 0:
-        best_threshold = 0.5
+    # Threshold search using MCC as objective (or use fixed threshold)
+    if fixed_threshold is not None:
+        best_threshold = fixed_threshold
     else:
-        mccs = []
-        for t in thresholds:
-            y_pred_at_t = (y_pred_proba > t).astype(int)
-            try:
-                mccs.append(matthews_corrcoef(y_true, y_pred_at_t))
-            except Exception:
-                mccs.append(-1.0)
-        best_idx = int(np.argmax(np.array(mccs)))
-        best_threshold = float(thresholds[best_idx])
+        precisions, recalls, thresholds = precision_recall_curve(y_true, y_pred_proba)
+        if thresholds.size == 0:
+            best_threshold = 0.5
+        else:
+            mccs = []
+            for t in thresholds:
+                y_pred_at_t = (y_pred_proba > t).astype(int)
+                try:
+                    mccs.append(matthews_corrcoef(y_true, y_pred_at_t))
+                except Exception:
+                    mccs.append(-1.0)
+            best_idx = int(np.argmax(np.array(mccs)))
+            best_threshold = float(thresholds[best_idx])
 
     y_pred = (y_pred_proba > best_threshold).astype(int)
 
