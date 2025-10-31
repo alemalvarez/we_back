@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 
 from core.schemas import RawDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
-from models.simple_2d import DeeperCustomConfig
+from models.squeezer import FlexibleSEConfig
 from core.logging import make_logger
 from core.cv import run_cv
 
@@ -19,16 +19,18 @@ def _read_subjects(path: str, dataset_name: str) -> list[str]:
         return splits[dataset_name]["cv_subjects"]
 
 def main() -> None:
-    model_config = DeeperCustomConfig(
-        model_name="DeeperCustom",
+    model_config = FlexibleSEConfig(
+        model_name="FlexibleSE",
+        use_se_blocks=True,
+        norm_type="batch",
         n_filters=[16, 32, 64, 128],
         kernel_sizes=[(100, 3), (15, 10), (10, 3), (5, 2)],
         strides=[(2, 2), (2, 2), (1, 1), (1, 1)],
         paddings=[(25, 1), (5, 2), (5, 1), (1, 1)],
         activation="relu",
-        dropout_before_activation=False,
         dropout_rate=0.5,
-    )
+        reduction_ratio=4,
+    )   
     optimizer_config = OptimizerConfig(
         learning_rate=0.004255107493153422,
         weight_decay=0.00005,
@@ -44,7 +46,7 @@ def main() -> None:
     )
     dataset_config = RawDatasetConfig(
         h5_file_path=H5_FILE_PATH,
-        dataset_names=["hurh", "poctep"],
+        dataset_names=["poctep"],
         raw_normalization='channel-subject',
         augment=False,
     )

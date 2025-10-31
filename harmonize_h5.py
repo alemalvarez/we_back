@@ -109,7 +109,7 @@ def apply_harmonization(df: pd.DataFrame) -> pd.DataFrame:
                     if col not in ["category", "category_binary", "ID", "origin", "Subject", "Segment", "is_eeg"]]
 
     # First, harmonize all MEG subjects together (is_eeg=False)
-    mask_meg = df_harmonized["is_eeg"] == False
+    mask_meg = ~df_harmonized["is_eeg"]
     if mask_meg.any():
         mask_controls_meg = mask_meg & (df_harmonized["category_binary"] == "NEGATIVE")
         controls_meg = df_harmonized.loc[mask_controls_meg, feature_cols]
@@ -128,10 +128,10 @@ def apply_harmonization(df: pd.DataFrame) -> pd.DataFrame:
 
             df_harmonized.loc[mask_meg, feature_cols] = normalized_vals
         else:
-            print(f"WARNING: No control subjects found for MEG data. Skipping harmonization for MEG.")
+            print("WARNING: No control subjects found for MEG data. Skipping harmonization for MEG.")
 
     # Then, harmonize each EEG database separately
-    mask_eeg = df_harmonized["is_eeg"] == True
+    mask_eeg = df_harmonized["is_eeg"]
     for db in df_harmonized.loc[mask_eeg, "origin"].unique():
         mask_db = (df_harmonized["origin"] == db) & mask_eeg
         mask_controls = mask_db & (df_harmonized["category_binary"] == "NEGATIVE")

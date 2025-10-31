@@ -4,9 +4,35 @@ project: AD_vs_HC_POCTEP
 metric:
   name: cv/segment_level_final_f1_mean
   goal: maximize
-run_cap: 50
+run_cap: 100
 
 parameters:
+  # Architecture preset (complete validated configs)
+  architecture:
+    values:
+      - tiny_2layer
+      - small_2layer
+      - compact_2layer
+      - small_3layer
+      - medium_3layer
+      - balanced_3layer
+      - small_4layer
+      - deep_4layer
+      - wide_shallow
+      - narrow_deep
+  
+  # SE block configuration
+  use_se_blocks:
+    values: [true, false]
+  
+  reduction_ratio:
+    values: [8, 16, 32]
+  
+  # Normalization type
+  norm_type:
+    values: [batch, group]
+  
+  # Training hyperparameters
   learning_rate:
     distribution: log_uniform_values
     min: 1.0e-5
@@ -19,17 +45,14 @@ parameters:
 
   dropout_rate:
     distribution: uniform
-    min: 0.3
+    min: 0.2
     max: 0.5
 
-  hidden_1_size:
-    values: [8, 16, 32, 64, 128]
-
-  hidden_2_size:
-    values: [8, 16, 32, 64, 128]
+  batch_size:
+    values: [16, 32, 64]
 
   activation:
-    values: [leaky_relu, gelu, silu]
+    values: [relu, leaky_relu, gelu, silu]
 
 program: experiments.AD_vs_HC.universal.raw.sweep
 
@@ -40,3 +63,4 @@ command:
   - -m
   - ${program}
   - ${args}
+
