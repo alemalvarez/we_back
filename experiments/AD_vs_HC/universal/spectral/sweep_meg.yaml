@@ -1,6 +1,6 @@
-name: definitive_eeg_spectral_net_sweep
+name: definitive_meg_spectral_net_sweep
 method: bayes
-project: AD_vs_HC_EEG
+project: AD_vs_HC_MEG
 metric:
   name: cv/segment_level_final_f1_mean
   goal: maximize

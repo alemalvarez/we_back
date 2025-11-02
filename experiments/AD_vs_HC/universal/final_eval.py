@@ -215,34 +215,33 @@ def train_and_evaluate(
 
 def main() -> None:
     """Main entry point."""
-    
-    # Configure model with best hyperparameters
-    # TODO: Update these with the best hyperparameters from your sweep
+
+    # Configure model with given hyperparameters
     model_config = AdvancedSpectralNetConfig(
         model_name="AdvancedSpectralNet",
         input_size=16,
-        hidden_1_size=32,
-        hidden_2_size=128,
-        dropout_rate=0.41449970599196473,
+        hidden_1_size=16,
+        hidden_2_size=64,
+        dropout_rate=0.37679458113063646,
         add_batch_norm=True,
-        activation="gelu",
+        activation="relu",
     )
-    
+
     optimizer_config = OptimizerConfig(
-        learning_rate=0.009996687976754293,
-        weight_decay=3.96278689021512e-05,
+        learning_rate=0.006658621105262209,
+        weight_decay=5.183695942889393e-06,
         use_cosine_annealing=False,
     )
-    
+
     criterion_config = CriterionConfig(
         pos_weight_type='multiplied',
         pos_weight_value=1.0,
     )
-    
+
     # Specify which dataset category to train on
     # Options: 'poctep', 'hurh', 'meg', 'eeg', 'all'
-    training_category = "poctep"  # Change this to train on different categories
-    
+    training_category = "eeg"  # Change this to train on different categories
+
     # Configure dataset - should match the training category
     # For single datasets, use just that dataset name
     # For 'eeg', use ['poctep', 'hurh']
@@ -255,20 +254,20 @@ def main() -> None:
         dataset_names = ["poctep", "hurh", "meg"]
     else:
         raise ValueError(f"Unknown training category: {training_category}")
-    
+
     dataset_config = SpectralDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=dataset_names,
         spectral_normalization='standard',
     )
-    
+
     run_config = RunConfig(
         network_config=model_config,
         optimizer_config=optimizer_config,
         criterion_config=criterion_config,
         dataset_config=dataset_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
-        batch_size=32,
+        batch_size=128,
         max_epochs=50,
         patience=10,
         min_delta=0.001,
@@ -279,17 +278,17 @@ def main() -> None:
             "run_name": f"train_on_{training_category}_spectral",
         },
     )
-    
+
     # Initialize logger
     magic_logger = make_logger(
         wandb_enabled=run_config.log_to_wandb,
         wandb_init=run_config.wandb_init
     )
-    
+
     # Log configuration
     magic_logger.log_params(run_config.model_dump(mode='python'))
     magic_logger.log_params({"training_category": training_category})
-    
+
     # Run training and evaluation
     train_and_evaluate(
         training_category=training_category,
