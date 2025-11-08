@@ -54,19 +54,21 @@ class RawDataset(Dataset):
                 n_segments = subject.attrs['n_segments']
                 
                 raw_segments = subject['raw_segments'][()]
+                
+                # Read is_eeg attribute and compute effective folder_id
+                is_eeg = subject.attrs.get('is_eeg', True)
+                folder_id = subject.attrs['folder_id']
+                effective_folder_id = 'MEG' if not is_eeg else folder_id
 
                 subject_data[subj_key] = {
                     'data': raw_segments,
                     'category': subject.attrs['category'],
-                    'folder_id': subject.attrs['folder_id'],
+                    'folder_id': folder_id,
+                    'is_eeg': is_eeg,
+                    'effective_folder_id': effective_folder_id,
                     'n_segments': n_segments
                 }
 
-        # Create all_segments only when needed for global normalization (deprecated modes)
-        if normalize in ['channel', 'full']:
-            all_data = [subject_data[subj_key]['data'] for subj_key in self.subject_ids]
-            all_segments = np.concatenate(all_data, axis=0)
-        
         # Apply normalization based on scope
         if normalize == 'sample-channel':
             # Normalize each segment and each channel independently
@@ -120,88 +122,77 @@ class RawDataset(Dataset):
                 normalized_segments = (data.astype(np.float32) - mean_val) / std_val
                 normalized_data.append(normalized_segments)
                 
-        elif normalize == 'channel':
-            # Normalize per channel across entire dataset
-            if all_segments is None:
-                raise ValueError("all_segments should not be None for channel normalization")
-            mean_vals = all_segments.mean(axis=(0, 1), keepdims=True, dtype=np.float32)  # mean per channel across all data
-            std_vals = all_segments.std(axis=(0, 1), keepdims=True, dtype=np.float32)    # std per channel across all data
-            std_vals[std_vals == 0] = 1.0
-
-            normalized_data = []
-            for subj_key in self.subject_ids:
-                data = subject_data[subj_key]['data']
-                normalized_segments = (data.astype(np.float32) - mean_vals) / std_vals
-                normalized_data.append(normalized_segments)
-
-        elif normalize == 'full':
-            # Normalize across entire dataset
-            if all_segments is None:
-                raise ValueError("all_segments should not be None for full normalization")
-            mean_val = all_segments.mean(dtype=np.float32)  # single mean for entire dataset
-            std_val = all_segments.std(dtype=np.float32)    # single std for entire dataset
-            if std_val == 0:
-                std_val = 1.0
-
-            normalized_data = []
-            for subj_key in self.subject_ids:
-                data = subject_data[subj_key]['data']
-                normalized_segments = (data.astype(np.float32) - mean_val) / std_val
-                normalized_data.append(normalized_segments)
-
         elif normalize == 'channel-dataset':
-            # Normalize per channel per database (folder_id)
+            # Normalize per channel per database (effective_folder_id - MEG unified)
+            # Check if we can use provided stats
+            use_provided_stats = False
             if norm_stats is not None and norm_stats.raw_stats is not None:
+                provided_stats = norm_stats.raw_stats
+                all_keys_present = True
+                for subj_key in self.subject_ids:
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    data = subject_data[subj_key]['data']
+                    n_channels = data.shape[2]
+                    for ch_idx in range(n_channels):
+                        key = ('dataset', effective_folder_id, ch_idx)
+                        if key not in provided_stats:
+                            all_keys_present = False
+                            break
+                    if not all_keys_present:
+                        break
+                use_provided_stats = all_keys_present
+            
+            if use_provided_stats:
                 # Use provided stats
                 logger.info("Using provided normalization stats for channel-dataset")
-                provided_stats = norm_stats.raw_stats
                 normalized_data = []
                 for subj_key in self.subject_ids:
                     data = subject_data[subj_key]['data']
-                    folder_id = subject_data[subj_key]['folder_id']
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
                     n_channels = data.shape[2]
                     normalized_segments = data.astype(np.float32).copy()
                     for ch_idx in range(n_channels):
-                        key = ('dataset', folder_id, ch_idx)
-                        if key in provided_stats:
-                            mean_val, std_val = provided_stats[key]
-                            normalized_segments[:, :, ch_idx] = (normalized_segments[:, :, ch_idx] - mean_val) / std_val
-                        else:
-                            logger.warning(f"No stats found for {key}, skipping normalization")
+                        key = ('dataset', effective_folder_id, ch_idx)
+                        mean_val, std_val = provided_stats[key]
+                        normalized_segments[:, :, ch_idx] = (normalized_segments[:, :, ch_idx] - mean_val) / std_val
                     normalized_data.append(normalized_segments)
                 self.norm_stats = norm_stats
             else:
-                # Compute stats per database per channel
-                logger.info("Computing normalization stats for channel-dataset")
-                # Group data by folder_id
+                # Compute stats from current data
+                if norm_stats is not None and norm_stats.raw_stats is not None:
+                    logger.warning("Missing normalization stats for some datasets, computing from test data")
+                else:
+                    logger.info("Computing normalization stats for channel-dataset")
+                
+                # Group data by effective_folder_id
                 data_by_db_ch: Dict[str, List[np.ndarray]] = {}
                 for subj_key in self.subject_ids:
-                    folder_id = subject_data[subj_key]['folder_id']
-                    if folder_id not in data_by_db_ch:
-                        data_by_db_ch[folder_id] = []
-                    data_by_db_ch[folder_id].append(subject_data[subj_key]['data'])
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    if effective_folder_id not in data_by_db_ch:
+                        data_by_db_ch[effective_folder_id] = []
+                    data_by_db_ch[effective_folder_id].append(subject_data[subj_key]['data'])
                 
                 # Compute stats per database per channel
                 stats_dict_ch: Dict[Any, Tuple[float, float]] = {}
-                for folder_id, db_data_list in data_by_db_ch.items():
-                    db_data = np.concatenate(db_data_list, axis=0)  # (n_segments, n_samples, n_channels)
+                for effective_folder_id, db_data_list in data_by_db_ch.items():
+                    db_data = np.concatenate(db_data_list, axis=0)
                     n_channels = db_data.shape[2]
                     for ch_idx in range(n_channels):
                         mean_val = db_data[:, :, ch_idx].mean(dtype=np.float32)
                         std_val = db_data[:, :, ch_idx].std(dtype=np.float32)
                         if std_val == 0:
                             std_val = 1.0
-                        stats_dict_ch[('dataset', folder_id, ch_idx)] = (float(mean_val), float(std_val))
+                        stats_dict_ch[('dataset', effective_folder_id, ch_idx)] = (float(mean_val), float(std_val))
                 
                 # Apply normalization
                 normalized_data = []
                 for subj_key in self.subject_ids:
                     data = subject_data[subj_key]['data']
-                    folder_id = subject_data[subj_key]['folder_id']
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
                     n_channels = data.shape[2]
                     normalized_segments = data.astype(np.float32).copy()
                     for ch_idx in range(n_channels):
-                        key = ('dataset', folder_id, ch_idx)
+                        key = ('dataset', effective_folder_id, ch_idx)
                         mean_val, std_val = stats_dict_ch[key]
                         normalized_segments[:, :, ch_idx] = (normalized_segments[:, :, ch_idx] - mean_val) / std_val
                     normalized_data.append(normalized_segments)
@@ -209,51 +200,63 @@ class RawDataset(Dataset):
                 self.norm_stats = NormalizationStats(raw_stats=stats_dict_ch)
 
         elif normalize == 'dataset':
-            # Normalize per database (folder_id) globally
+            # Normalize per database (effective_folder_id - MEG unified) globally
+            # Check if we can use provided stats
+            use_provided_stats = False
             if norm_stats is not None and norm_stats.raw_stats is not None:
+                provided_stats = norm_stats.raw_stats
+                all_keys_present = True
+                for subj_key in self.subject_ids:
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    key_db = ('dataset', effective_folder_id)
+                    if key_db not in provided_stats:
+                        all_keys_present = False
+                        break
+                use_provided_stats = all_keys_present
+            
+            if use_provided_stats:
                 # Use provided stats
                 logger.info("Using provided normalization stats for dataset")
-                provided_stats = norm_stats.raw_stats
                 normalized_data = []
                 for subj_key in self.subject_ids:
                     data = subject_data[subj_key]['data']
-                    folder_id = subject_data[subj_key]['folder_id']
-                    key_db = ('dataset', folder_id)
-                    if key_db in provided_stats:
-                        mean_val, std_val = provided_stats[key_db]
-                        normalized_segments = (data.astype(np.float32) - mean_val) / std_val
-                    else:
-                        logger.warning(f"No stats found for {key_db}, skipping normalization")
-                        normalized_segments = data.astype(np.float32)
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    key_db = ('dataset', effective_folder_id)
+                    mean_val, std_val = provided_stats[key_db]
+                    normalized_segments = (data.astype(np.float32) - mean_val) / std_val
                     normalized_data.append(normalized_segments)
                 self.norm_stats = norm_stats
             else:
-                # Compute stats per database
-                logger.info("Computing normalization stats for dataset")
-                # Group data by folder_id
+                # Compute stats from current data
+                if norm_stats is not None and norm_stats.raw_stats is not None:
+                    logger.warning("Missing normalization stats for some datasets, computing from test data")
+                else:
+                    logger.info("Computing normalization stats for dataset")
+                
+                # Group data by effective_folder_id
                 data_by_db_global: Dict[str, List[np.ndarray]] = {}
                 for subj_key in self.subject_ids:
-                    folder_id = subject_data[subj_key]['folder_id']
-                    if folder_id not in data_by_db_global:
-                        data_by_db_global[folder_id] = []
-                    data_by_db_global[folder_id].append(subject_data[subj_key]['data'])
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    if effective_folder_id not in data_by_db_global:
+                        data_by_db_global[effective_folder_id] = []
+                    data_by_db_global[effective_folder_id].append(subject_data[subj_key]['data'])
                 
                 # Compute stats per database
                 stats_dict_global: Dict[Any, Tuple[float, float]] = {}
-                for folder_id, db_data_list in data_by_db_global.items():
+                for effective_folder_id, db_data_list in data_by_db_global.items():
                     db_data = np.concatenate(db_data_list, axis=0)
                     mean_val = db_data.mean(dtype=np.float32)
                     std_val = db_data.std(dtype=np.float32)
                     if std_val == 0:
                         std_val = 1.0
-                    stats_dict_global[('dataset', folder_id)] = (float(mean_val), float(std_val))
+                    stats_dict_global[('dataset', effective_folder_id)] = (float(mean_val), float(std_val))
                 
                 # Apply normalization
                 normalized_data = []
                 for subj_key in self.subject_ids:
                     data = subject_data[subj_key]['data']
-                    folder_id = subject_data[subj_key]['folder_id']
-                    key_db = ('dataset', folder_id)
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    key_db = ('dataset', effective_folder_id)
                     mean_val, std_val = stats_dict_global[key_db]
                     normalized_segments = (data.astype(np.float32) - mean_val) / std_val
                     normalized_data.append(normalized_segments)
@@ -261,59 +264,77 @@ class RawDataset(Dataset):
                 self.norm_stats = NormalizationStats(raw_stats=stats_dict_global)
 
         elif normalize == 'control-channel':
-            # Normalize per channel per database using only HC subjects
+            # Normalize per channel per database using only HC subjects (effective_folder_id - MEG unified)
+            # Check if we can use provided stats
+            use_provided_stats = False
             if norm_stats is not None and norm_stats.raw_stats is not None:
+                provided_stats = norm_stats.raw_stats
+                all_keys_present = True
+                for subj_key in self.subject_ids:
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    data = subject_data[subj_key]['data']
+                    n_channels = data.shape[2]
+                    for ch_idx in range(n_channels):
+                        key = ('dataset', effective_folder_id, ch_idx)
+                        if key not in provided_stats:
+                            all_keys_present = False
+                            break
+                    if not all_keys_present:
+                        break
+                use_provided_stats = all_keys_present
+            
+            if use_provided_stats:
                 # Use provided stats
                 logger.info("Using provided normalization stats for control-channel")
-                provided_stats = norm_stats.raw_stats
                 normalized_data = []
                 for subj_key in self.subject_ids:
                     data = subject_data[subj_key]['data']
-                    folder_id = subject_data[subj_key]['folder_id']
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
                     n_channels = data.shape[2]
                     normalized_segments = data.astype(np.float32).copy()
                     for ch_idx in range(n_channels):
-                        key = ('dataset', folder_id, ch_idx)
-                        if key in provided_stats:
-                            mean_val, std_val = provided_stats[key]
-                            normalized_segments[:, :, ch_idx] = (normalized_segments[:, :, ch_idx] - mean_val) / std_val
-                        else:
-                            logger.warning(f"No stats found for {key}, skipping normalization")
+                        key = ('dataset', effective_folder_id, ch_idx)
+                        mean_val, std_val = provided_stats[key]
+                        normalized_segments[:, :, ch_idx] = (normalized_segments[:, :, ch_idx] - mean_val) / std_val
                     normalized_data.append(normalized_segments)
                 self.norm_stats = norm_stats
             else:
-                # Compute stats per database per channel using only HC subjects
-                logger.info("Computing normalization stats for control-channel (HC only)")
-                # Group HC data by folder_id
+                # Compute stats from current data
+                if norm_stats is not None and norm_stats.raw_stats is not None:
+                    logger.warning("Missing normalization stats for some datasets, computing from test data")
+                else:
+                    logger.info("Computing normalization stats for control-channel (HC only)")
+                
+                # Group HC data by effective_folder_id
                 hc_data_by_db_ch: Dict[str, List[np.ndarray]] = {}
                 for subj_key in self.subject_ids:
                     if subject_data[subj_key]['category'] == 'HC':
-                        folder_id = subject_data[subj_key]['folder_id']
-                        if folder_id not in hc_data_by_db_ch:
-                            hc_data_by_db_ch[folder_id] = []
-                        hc_data_by_db_ch[folder_id].append(subject_data[subj_key]['data'])
+                        effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                        if effective_folder_id not in hc_data_by_db_ch:
+                            hc_data_by_db_ch[effective_folder_id] = []
+                        hc_data_by_db_ch[effective_folder_id].append(subject_data[subj_key]['data'])
                 
                 # Compute stats per database per channel from HC subjects
                 stats_dict_ctrl_ch: Dict[Any, Tuple[float, float]] = {}
-                for folder_id, db_data_list in hc_data_by_db_ch.items():
-                    db_data = np.concatenate(db_data_list, axis=0)  # (n_segments, n_samples, n_channels)
+                for effective_folder_id, db_data_list in hc_data_by_db_ch.items():
+                    db_data = np.concatenate(db_data_list, axis=0)
                     n_channels = db_data.shape[2]
                     for ch_idx in range(n_channels):
                         mean_val = db_data[:, :, ch_idx].mean(dtype=np.float32)
                         std_val = db_data[:, :, ch_idx].std(dtype=np.float32)
                         if std_val == 0:
                             std_val = 1.0
-                        stats_dict_ctrl_ch[('dataset', folder_id, ch_idx)] = (float(mean_val), float(std_val))
+                        stats_dict_ctrl_ch[('dataset', effective_folder_id, ch_idx)] = (float(mean_val), float(std_val))
                 
                 # Apply normalization to all subjects
                 normalized_data = []
                 for subj_key in self.subject_ids:
                     data = subject_data[subj_key]['data']
-                    folder_id = subject_data[subj_key]['folder_id']
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
                     n_channels = data.shape[2]
                     normalized_segments = data.astype(np.float32).copy()
                     for ch_idx in range(n_channels):
-                        key = ('dataset', folder_id, ch_idx)
+                        key = ('dataset', effective_folder_id, ch_idx)
                         if key in stats_dict_ctrl_ch:
                             mean_val, std_val = stats_dict_ctrl_ch[key]
                             normalized_segments[:, :, ch_idx] = (normalized_segments[:, :, ch_idx] - mean_val) / std_val
@@ -324,52 +345,64 @@ class RawDataset(Dataset):
                 self.norm_stats = NormalizationStats(raw_stats=stats_dict_ctrl_ch)
 
         elif normalize == 'control-global':
-            # Normalize per database using only HC subjects (global across channels)
+            # Normalize per database using only HC subjects (effective_folder_id - MEG unified, global across channels)
+            # Check if we can use provided stats
+            use_provided_stats = False
             if norm_stats is not None and norm_stats.raw_stats is not None:
+                provided_stats = norm_stats.raw_stats
+                all_keys_present = True
+                for subj_key in self.subject_ids:
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    key_ctrl = ('dataset', effective_folder_id)
+                    if key_ctrl not in provided_stats:
+                        all_keys_present = False
+                        break
+                use_provided_stats = all_keys_present
+            
+            if use_provided_stats:
                 # Use provided stats
                 logger.info("Using provided normalization stats for control-global")
-                provided_stats = norm_stats.raw_stats
                 normalized_data = []
                 for subj_key in self.subject_ids:
                     data = subject_data[subj_key]['data']
-                    folder_id = subject_data[subj_key]['folder_id']
-                    key_ctrl = ('dataset', folder_id)
-                    if key_ctrl in provided_stats:
-                        mean_val, std_val = provided_stats[key_ctrl]
-                        normalized_segments = (data.astype(np.float32) - mean_val) / std_val
-                    else:
-                        logger.warning(f"No stats found for {key_ctrl}, skipping normalization")
-                        normalized_segments = data.astype(np.float32)
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    key_ctrl = ('dataset', effective_folder_id)
+                    mean_val, std_val = provided_stats[key_ctrl]
+                    normalized_segments = (data.astype(np.float32) - mean_val) / std_val
                     normalized_data.append(normalized_segments)
                 self.norm_stats = norm_stats
             else:
-                # Compute stats per database using only HC subjects
-                logger.info("Computing normalization stats for control-global (HC only)")
-                # Group HC data by folder_id
+                # Compute stats from current data
+                if norm_stats is not None and norm_stats.raw_stats is not None:
+                    logger.warning("Missing normalization stats for some datasets, computing from test data")
+                else:
+                    logger.info("Computing normalization stats for control-global (HC only)")
+                
+                # Group HC data by effective_folder_id
                 hc_data_by_db_global: Dict[str, List[np.ndarray]] = {}
                 for subj_key in self.subject_ids:
                     if subject_data[subj_key]['category'] == 'HC':
-                        folder_id = subject_data[subj_key]['folder_id']
-                        if folder_id not in hc_data_by_db_global:
-                            hc_data_by_db_global[folder_id] = []
-                        hc_data_by_db_global[folder_id].append(subject_data[subj_key]['data'])
+                        effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                        if effective_folder_id not in hc_data_by_db_global:
+                            hc_data_by_db_global[effective_folder_id] = []
+                        hc_data_by_db_global[effective_folder_id].append(subject_data[subj_key]['data'])
                 
                 # Compute stats per database from HC subjects
                 stats_dict_ctrl_global: Dict[Any, Tuple[float, float]] = {}
-                for folder_id, db_data_list in hc_data_by_db_global.items():
+                for effective_folder_id, db_data_list in hc_data_by_db_global.items():
                     db_data = np.concatenate(db_data_list, axis=0)
                     mean_val = db_data.mean(dtype=np.float32)
                     std_val = db_data.std(dtype=np.float32)
                     if std_val == 0:
                         std_val = 1.0
-                    stats_dict_ctrl_global[('dataset', folder_id)] = (float(mean_val), float(std_val))
+                    stats_dict_ctrl_global[('dataset', effective_folder_id)] = (float(mean_val), float(std_val))
                 
                 # Apply normalization to all subjects
                 normalized_data = []
                 for subj_key in self.subject_ids:
                     data = subject_data[subj_key]['data']
-                    folder_id = subject_data[subj_key]['folder_id']
-                    key_ctrl = ('dataset', folder_id)
+                    effective_folder_id = subject_data[subj_key]['effective_folder_id']
+                    key_ctrl = ('dataset', effective_folder_id)
                     if key_ctrl in stats_dict_ctrl_global:
                         mean_val, std_val = stats_dict_ctrl_global[key_ctrl]
                         normalized_segments = (data.astype(np.float32) - mean_val) / std_val

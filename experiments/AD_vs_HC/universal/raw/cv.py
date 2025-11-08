@@ -61,7 +61,7 @@ def main() -> None:
         patience=10,
         min_delta=0.001,
         early_stopping_metric='loss',
-        log_to_wandb=True,
+        log_to_wandb=False,
         wandb_init={
             "project": "test-da-framework",
         },
