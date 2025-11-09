@@ -13,6 +13,7 @@ from core.spectral_dataset import SpectralDataset
 from core.raw_dataset import RawDataset
 from models.squeezer import DeeperSE, FlexibleSE
 from models.shallow_concatter import ShallowerConcatter
+from models.shallow_concatter_se import ShallowConcatterSE
 
 def build_model(config: NetworkConfig) -> nn.Module: 
     name_class_map = {
@@ -28,6 +29,7 @@ def build_model(config: NetworkConfig) -> nn.Module:
         "DeeperSE": DeeperSE,
         "FlexibleSE": FlexibleSE,
         "ShallowerConcatter": ShallowerConcatter,
+        "ShallowConcatterSE": ShallowConcatterSE,
     }
     return name_class_map[config.model_name](config)
 

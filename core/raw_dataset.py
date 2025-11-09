@@ -46,7 +46,6 @@ class RawDataset(Dataset):
         self.augment_prob = augment_prob
         self.noise_std = noise_std
         subject_data = {}  # Store subject data for normalization
-        all_segments = None  # Will be created only when needed
 
         with h5py.File(h5_file_path, 'r') as f:
             for subj_key in self.subject_ids:

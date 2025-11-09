@@ -3,8 +3,8 @@ import os
 from dotenv import load_dotenv
 import wandb
 
-from core.schemas import OptimizerConfig, CriterionConfig, RunConfig, RawDatasetConfig
-from models.squeezer import FlexibleSEConfig
+from core.schemas import OptimizerConfig, CriterionConfig, RunConfig, MultiDatasetConfig
+from models.shallow_concatter_se import ShallowConcatterSEConfig, get_architecture_preset
 from core.logging import make_logger
 from core.cv import run_cv
 
@@ -19,9 +19,8 @@ def _read_subjects(path: str, dataset_name: str) -> list[str]:
         splits = json.load(f)
         return splits[dataset_name]["cv_subjects"]
 
-# Architecture presets - each is a complete, validated configuration
+# Architecture presets - shallow 2-layer architectures only
 ARCHITECTURE_PRESETS = {
-    # 2-layer architectures (shallow, fewer params)
     "tiny_2layer": {
         "n_filters": [16, 32],
         "kernel_sizes": [(40, 2), (8, 5)],
@@ -40,91 +39,74 @@ ARCHITECTURE_PRESETS = {
         "strides": [(15, 3), (12, 2)],
         "paddings": [(5, 1), (3, 1)],
     },
-    
-    # 3-layer architectures (medium complexity)
-    "small_3layer": {
-        "n_filters": [16, 32, 64],
-        "kernel_sizes": [(40, 2), (8, 5), (5, 2)],
-        "strides": [(12, 6), (10, 5), (5, 2)],
-        "paddings": [(5, 0), (1, 1), (1, 0)],
+    "medium_2layer": {
+        "n_filters": [48, 96],
+        "kernel_sizes": [(45, 3), (12, 4)],
+        "strides": [(10, 2), (8, 3)],
+        "paddings": [(8, 1), (2, 1)],
     },
-    "medium_3layer": {
-        "n_filters": [32, 64, 128],
-        "kernel_sizes": [(30, 3), (10, 5), (5, 2)],
-        "strides": [(10, 2), (8, 4), (4, 2)],
-        "paddings": [(8, 1), (2, 1), (1, 1)],
-    },
-    "balanced_3layer": {
-        "n_filters": [24, 48, 96],
-        "kernel_sizes": [(50, 2), (15, 3), (8, 2)],
-        "strides": [(8, 2), (6, 3), (4, 2)],
-        "paddings": [(10, 1), (3, 1), (2, 1)],
-    },
-    
-    # 4-layer architectures (deeper)
-    "small_4layer": {
-        "n_filters": [16, 32, 64, 128],
-        "kernel_sizes": [(50, 3), (15, 5), (8, 3), (4, 2)],
-        "strides": [(10, 2), (8, 3), (4, 2), (2, 1)],
-        "paddings": [(10, 1), (3, 1), (2, 1), (1, 0)],
-    },
-    "deep_4layer": {
-        "n_filters": [32, 64, 96, 128],
-        "kernel_sizes": [(40, 2), (12, 4), (6, 3), (3, 2)],
-        "strides": [(12, 2), (8, 2), (4, 2), (2, 1)],
-        "paddings": [(8, 1), (2, 1), (1, 1), (1, 0)],
-    },
-    
-    # Alternative patterns
-    "wide_shallow": {
+    "wide_2layer": {
         "n_filters": [64, 128],
         "kernel_sizes": [(60, 2), (12, 4)],
         "strides": [(8, 2), (6, 3)],
         "paddings": [(5, 1), (2, 1)],
     },
-    "narrow_deep": {
-        "n_filters": [16, 24, 32, 48],
-        "kernel_sizes": [(35, 4), (12, 4), (8, 2), (4, 2)],
-        "strides": [(8, 3), (6, 2), (4, 2), (2, 1)],
-        "paddings": [(5, 1), (2, 1), (2, 1), (1, 0)],
-    },
 }
-
-def _get_architecture_preset(preset_name: str) -> dict:
-    """Get architecture parameters from preset name (all presets are pre-validated)."""
-    if preset_name not in ARCHITECTURE_PRESETS:
-        raise ValueError(f"Unknown architecture preset: {preset_name}. Available: {list(ARCHITECTURE_PRESETS.keys())}")
-    
-    return ARCHITECTURE_PRESETS[preset_name]
 
 def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore[name-defined]
     # Get architecture from preset
     architecture_preset = cfg.get("architecture", "tiny_2layer")
-    preset = _get_architecture_preset(architecture_preset)
+    preset = get_architecture_preset(architecture_preset)
     
     n_filters = preset["n_filters"]
     kernel_sizes = preset["kernel_sizes"]
     strides = preset["strides"]
     paddings = preset["paddings"]
     
-    # Parse SE block and normalization parameters
+    # Parse SE block parameters
     use_se_blocks = bool(cfg.get("use_se_blocks", True))
     reduction_ratio = int(cfg.get("reduction_ratio", 16))
-    norm_type = str(cfg.get("norm_type", "batch"))
     
-    input_shape = (1000, 68)
-    model_config = FlexibleSEConfig(
-        model_name="FlexibleSE",
+    # Parse normalization parameters
+    raw_norm_type = str(cfg.get("raw_norm_type", "batch"))
+    spectral_norm_type = str(cfg.get("spectral_norm_type", "batch"))
+    fusion_norm_enabled = bool(cfg.get("fusion_norm_enabled", True))
+    
+    # Parse dropout rates
+    raw_dropout_rate = float(cfg.get("raw_dropout_rate", 0.4))
+    spectral_dropout_rate = float(cfg.get("spectral_dropout_rate", 0.3))
+    concat_dropout_rate = float(cfg.get("concat_dropout_rate", 0.4))
+    
+    # Parse spectral branch parameters
+    spectral_hidden_size = int(cfg.get("spectral_hidden_size", 64))
+    n_spectral_features = 748  # DK features
+    
+    # Parse fusion parameters
+    fusion_hidden_size = int(cfg.get("fusion_hidden_size", 128))
+    gap_length = int(cfg.get("gap_length", 4))
+    
+    # Parse shared parameters
+    activation = str(cfg.get("activation", "relu"))
+    
+    model_config = ShallowConcatterSEConfig(
+        model_name="ShallowConcatterSE",
         use_se_blocks=use_se_blocks,
-        norm_type=norm_type,
+        reduction_ratio=reduction_ratio,
         n_filters=n_filters,
         kernel_sizes=kernel_sizes,
         strides=strides,
         paddings=paddings,
-        activation=cfg.get("activation", "relu"),
-        dropout_rate=float(cfg.get("dropout_rate", 0.4)),
-        reduction_ratio=reduction_ratio,
-        input_shape=input_shape,
+        raw_norm_type=raw_norm_type,
+        raw_dropout_rate=raw_dropout_rate,
+        n_spectral_features=n_spectral_features,
+        spectral_hidden_size=spectral_hidden_size,
+        spectral_norm_type=spectral_norm_type,
+        spectral_dropout_rate=spectral_dropout_rate,
+        concat_dropout_rate=concat_dropout_rate,
+        fusion_hidden_size=fusion_hidden_size,
+        fusion_norm_enabled=fusion_norm_enabled,
+        activation=activation,
+        gap_length=gap_length,
     )
     optimizer_config = OptimizerConfig(
         learning_rate=float(cfg.get("learning_rate", 0.003111076215981144)),
@@ -138,11 +120,11 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         pos_weight_type='multiplied',
         pos_weight_value=1.0,
     )
-    dataset_config = RawDatasetConfig(
+    dataset_config = MultiDatasetConfig(
         h5_file_path=H5_FILE_PATH,
-        dataset_names=["poctep"],
+        dataset_names=["poctep", "nca"],
         raw_normalization=cfg.get("raw_normalization", "channel-subject"),
-        augment=False,
+        spectral_normalization='standard',
     )
     run_config = RunConfig(
         network_config=model_config,
