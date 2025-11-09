@@ -6,7 +6,7 @@ from pydantic import model_validator
 
 from core.schemas import NetworkConfig
 from models.squeezer import SEBlock
-
+from loguru import logger
 
 # Architecture presets for 2-layer shallow architectures
 ARCHITECTURE_PRESETS = {
@@ -242,7 +242,15 @@ class ShallowConcatterSE(nn.Module):
         
         # Process raw branch
         x_raw = self.raw_conv(x_raw)
-        x_raw = self.gap(x_raw)
+        
+        # MPS workaround: adaptive pooling requires divisible sizes on MPS
+        if x_raw.device.type == 'mpsa':
+            logger.warning("MPS workaround: adaptive pooling requires divisible sizes on MPS")
+            original_device = x_raw.device
+            x_raw = self.gap(x_raw.cpu()).to(original_device)
+        else:
+            x_raw = self.gap(x_raw)
+        
         x_raw = x_raw.flatten(1)
         
         # Process spectral branch

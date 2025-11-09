@@ -4,7 +4,7 @@ project: AD_vs_HC_POCTEP
 metric:
   name: cv/segment_level_final_f1_mean
   goal: maximize
-run_cap: 100
+run_cap: 50
 
 parameters:
   # Architecture preset (shallow 2-layer configs)

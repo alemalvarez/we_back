@@ -122,7 +122,7 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
     )
     dataset_config = MultiDatasetConfig(
         h5_file_path=H5_FILE_PATH,
-        dataset_names=["poctep", "nca"],
+        dataset_names=["poctep"],
         raw_normalization=cfg.get("raw_normalization", "channel-subject"),
         spectral_normalization='standard',
     )

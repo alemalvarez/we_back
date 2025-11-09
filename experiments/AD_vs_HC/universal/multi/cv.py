@@ -34,7 +34,7 @@ def main() -> None:
         concat_dropout_rate=0.5642264679590964,
         fusion_hidden_size=256,
         activation="relu",
-        gap_length=2,
+        gap_length=8,
         raw_norm_type="group",
         spectral_norm_type="none",
         fusion_norm_enabled=False,
@@ -54,7 +54,7 @@ def main() -> None:
     )
     dataset_config = MultiDatasetConfig(
         h5_file_path=H5_FILE_PATH,
-        dataset_names=["poctep"],
+        dataset_names=["poctep", "hurh", "meg"],
         raw_normalization='channel-subject',
         spectral_normalization='standard',
     )
