@@ -4,8 +4,8 @@ from typing import Dict, List, Tuple
 from dotenv import load_dotenv
 from loguru import logger
 
-from core.schemas import SpectralDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
-from models.spectral_net import AdvancedSpectralNetConfig
+from core.schemas import MultiDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
+from models.shallow_concatter_se import ShallowConcatterSEConfig, get_architecture_preset
 from core.logging import make_logger, Logger
 from core.builders import build_dataset
 from core.runner import run as run_single
@@ -216,20 +216,32 @@ def train_and_evaluate(
 def main() -> None:
     """Main entry point."""
 
-    # Configure model with given hyperparameters
-    model_config = AdvancedSpectralNetConfig(
-        model_name="AdvancedSpectralNet",
-        input_size=16,
-        hidden_1_size=16,
-        hidden_2_size=64,
-        dropout_rate=0.37679458113063646,
-        add_batch_norm=True,
-        activation="relu",
+    # Configure model with specified hyperparameters
+    model_config = ShallowConcatterSEConfig(
+        model_name="ShallowConcatterSE",
+        # Raw branch (conv) parameters
+        **get_architecture_preset("medium_2layer"),
+        raw_norm_type="batch",
+        raw_dropout_rate=0.3249437779944897,
+        use_se_blocks=False,
+        reduction_ratio=16,
+        # Spectral branch parameters
+        n_spectral_features=16,
+        spectral_hidden_size=32,
+        spectral_norm_type="none",
+        spectral_dropout_rate=0.4016707169576863,
+        # Fusion parameters
+        concat_dropout_rate=0.32291692046947057,
+        fusion_hidden_size=256,
+        fusion_norm_enabled=True,
+        # Shared/other settings
+        activation="gelu",
+        gap_length=8,
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=0.006658621105262209,
-        weight_decay=5.183695942889393e-06,
+        learning_rate=0.0008690440561214024,
+        weight_decay=2.3569982397796884e-05,
         use_cosine_annealing=False,
     )
 
@@ -240,7 +252,7 @@ def main() -> None:
 
     # Specify which dataset category to train on
     # Options: 'poctep', 'hurh', 'meg', 'eeg', 'all'
-    training_category = "eeg"  # Change this to train on different categories
+    training_category = "poctep"  # Change this to train on different categories
 
     # Configure dataset - should match the training category
     # For single datasets, use just that dataset name
@@ -255,10 +267,11 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown training category: {training_category}")
 
-    dataset_config = SpectralDatasetConfig(
+    dataset_config = MultiDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=dataset_names,
-        spectral_normalization='standard',
+        raw_normalization="dataset",
+        spectral_normalization="standard",
     )
 
     run_config = RunConfig(
@@ -267,7 +280,7 @@ def main() -> None:
         criterion_config=criterion_config,
         dataset_config=dataset_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
-        batch_size=128,
+        batch_size=64,
         max_epochs=50,
         patience=10,
         min_delta=0.001,
@@ -275,7 +288,7 @@ def main() -> None:
         log_to_wandb=True,
         wandb_init={
             "project": "AD_vs_HC_final_eval",
-            "run_name": f"train_on_{training_category}_spectral",
+            "run_name": f"train_on_{training_category}_multi",
         },
     )
 

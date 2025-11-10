@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 
 from core.schemas import MultiDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
-from models.shallow_concatter_se import ShallowConcatterSEConfig
+from models.shallow_concatter_se import ShallowConcatterSEConfig, get_architecture_preset
 from core.logging import make_logger
 from core.cv import run_cv
 
@@ -19,14 +19,17 @@ def _read_subjects(path: str, dataset_name: str) -> list[str]:
         return splits[dataset_name]["cv_subjects"]
 
 def main() -> None:
+    # Use proven_tiny architecture preset
+    preset = get_architecture_preset("proven_tiny")
+    
     model_config = ShallowConcatterSEConfig(
         model_name="ShallowConcatterSE",
         use_se_blocks=True,
         reduction_ratio=4,
-        n_filters=[16, 32],
-        kernel_sizes=[(40, 2), (8, 5)],
-        strides=[(12, 6), (10, 5)],
-        paddings=[(5, 0), (1, 1)],
+        n_filters=preset["n_filters"],
+        kernel_sizes=preset["kernel_sizes"],
+        strides=preset["strides"],
+        paddings=preset["paddings"],
         raw_dropout_rate=0.39811932916850734,
         n_spectral_features=16,
         spectral_hidden_size=128,

@@ -20,36 +20,43 @@ def _read_subjects(path: str, dataset_name: str) -> list[str]:
         return splits[dataset_name]["cv_subjects"]
 
 # Architecture presets - shallow 2-layer architectures only
+# Designed for input shape: (batch, 1, 68 channels, 1000 time_steps)
 ARCHITECTURE_PRESETS = {
-    "tiny_2layer": {
+    "proven_tiny": {
         "n_filters": [16, 32],
         "kernel_sizes": [(40, 2), (8, 5)],
         "strides": [(12, 6), (10, 5)],
         "paddings": [(5, 0), (1, 1)],
     },
+    "tiny_2layer": {
+        "n_filters": [16, 32],
+        "kernel_sizes": [(25, 5), (5, 5)],
+        "strides": [(8, 4), (4, 4)],
+        "paddings": [(2, 2), (1, 1)],
+    },
     "small_2layer": {
         "n_filters": [32, 64],
-        "kernel_sizes": [(50, 3), (10, 5)],
-        "strides": [(10, 2), (8, 4)],
-        "paddings": [(10, 1), (2, 1)],
+        "kernel_sizes": [(30, 7), (6, 5)],
+        "strides": [(6, 3), (3, 3)],
+        "paddings": [(2, 2), (1, 1)],
     },
     "compact_2layer": {
         "n_filters": [16, 32],
-        "kernel_sizes": [(30, 4), (15, 3)],
-        "strides": [(15, 3), (12, 2)],
-        "paddings": [(5, 1), (3, 1)],
+        "kernel_sizes": [(20, 5), (5, 3)],
+        "strides": [(10, 5), (5, 3)],
+        "paddings": [(2, 1), (1, 1)],
     },
     "medium_2layer": {
         "n_filters": [48, 96],
-        "kernel_sizes": [(45, 3), (12, 4)],
-        "strides": [(10, 2), (8, 3)],
-        "paddings": [(8, 1), (2, 1)],
+        "kernel_sizes": [(35, 9), (7, 5)],
+        "strides": [(5, 3), (3, 2)],
+        "paddings": [(3, 2), (2, 1)],
     },
     "wide_2layer": {
         "n_filters": [64, 128],
-        "kernel_sizes": [(60, 2), (12, 4)],
-        "strides": [(8, 2), (6, 3)],
-        "paddings": [(5, 1), (2, 1)],
+        "kernel_sizes": [(40, 11), (8, 7)],
+        "strides": [(4, 3), (2, 2)],
+        "paddings": [(3, 3), (2, 2)],
     },
 }
 
@@ -79,7 +86,7 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
     
     # Parse spectral branch parameters
     spectral_hidden_size = int(cfg.get("spectral_hidden_size", 64))
-    n_spectral_features = 748  # DK features
+    n_spectral_features = 16  # Standard spectral features (IAF, MF, 6 relative powers, RE, SE, SB, SC, SCF, SEF95, TF, TE)
     
     # Parse fusion parameters
     fusion_hidden_size = int(cfg.get("fusion_hidden_size", 128))

@@ -10,6 +10,7 @@ parameters:
   # Architecture preset (shallow 2-layer configs)
   architecture:
     values:
+      - proven_tiny
       - tiny_2layer
       - small_2layer
       - compact_2layer

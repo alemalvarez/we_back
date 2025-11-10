@@ -6,39 +6,45 @@ from pydantic import model_validator
 
 from core.schemas import NetworkConfig
 from models.squeezer import SEBlock
-from loguru import logger
 
 # Architecture presets for 2-layer shallow architectures
+# Designed for input shape: (batch, 1, 68 channels, 1000 time_steps)
 ARCHITECTURE_PRESETS = {
-    "tiny_2layer": {
+    "proven_tiny": {
         "n_filters": [16, 32],
         "kernel_sizes": [(40, 2), (8, 5)],
         "strides": [(12, 6), (10, 5)],
         "paddings": [(5, 0), (1, 1)],
     },
+    "tiny_2layer": {
+        "n_filters": [16, 32],
+        "kernel_sizes": [(25, 5), (5, 5)],
+        "strides": [(8, 4), (4, 4)],
+        "paddings": [(2, 2), (1, 1)],
+    },
     "small_2layer": {
         "n_filters": [32, 64],
-        "kernel_sizes": [(50, 3), (10, 5)],
-        "strides": [(10, 2), (8, 4)],
-        "paddings": [(10, 1), (2, 1)],
+        "kernel_sizes": [(30, 7), (6, 5)],
+        "strides": [(6, 3), (3, 3)],
+        "paddings": [(2, 2), (1, 1)],
     },
     "compact_2layer": {
         "n_filters": [16, 32],
-        "kernel_sizes": [(30, 4), (15, 3)],
-        "strides": [(15, 3), (12, 2)],
-        "paddings": [(5, 1), (3, 1)],
+        "kernel_sizes": [(20, 5), (5, 3)],
+        "strides": [(10, 5), (5, 3)],
+        "paddings": [(2, 1), (1, 1)],
     },
     "medium_2layer": {
         "n_filters": [48, 96],
-        "kernel_sizes": [(45, 3), (12, 4)],
-        "strides": [(10, 2), (8, 3)],
-        "paddings": [(8, 1), (2, 1)],
+        "kernel_sizes": [(35, 9), (7, 5)],
+        "strides": [(5, 3), (3, 2)],
+        "paddings": [(3, 2), (2, 1)],
     },
     "wide_2layer": {
         "n_filters": [64, 128],
-        "kernel_sizes": [(60, 2), (12, 4)],
-        "strides": [(8, 2), (6, 3)],
-        "paddings": [(5, 1), (2, 1)],
+        "kernel_sizes": [(40, 11), (8, 7)],
+        "strides": [(4, 3), (2, 2)],
+        "paddings": [(3, 3), (2, 2)],
     },
 }
 
@@ -244,8 +250,8 @@ class ShallowConcatterSE(nn.Module):
         x_raw = self.raw_conv(x_raw)
         
         # MPS workaround: adaptive pooling requires divisible sizes on MPS
-        if x_raw.device.type == 'mpsa':
-            logger.warning("MPS workaround: adaptive pooling requires divisible sizes on MPS")
+        if x_raw.device.type == 'mps':
+            # logger.warning("MPS workaround: adaptive pooling requires divisible sizes on MPS")
             original_device = x_raw.device
             x_raw = self.gap(x_raw.cpu()).to(original_device)
         else:
