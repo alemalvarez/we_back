@@ -4,8 +4,8 @@ from typing import Dict, List, Tuple
 from dotenv import load_dotenv
 from loguru import logger
 
-from core.schemas import MultiDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
-from models.shallow_concatter_se import ShallowConcatterSEConfig, get_architecture_preset
+from core.schemas import RawDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
+from models.squeezer import FlexibleSEConfig
 from core.logging import make_logger, Logger
 from core.builders import build_dataset
 from core.runner import run as run_single
@@ -216,32 +216,24 @@ def train_and_evaluate(
 def main() -> None:
     """Main entry point."""
 
-    # Configure model with specified hyperparameters
-    model_config = ShallowConcatterSEConfig(
-        model_name="ShallowConcatterSE",
-        # Raw branch (conv) parameters
-        **get_architecture_preset("medium_2layer"),
-        raw_norm_type="batch",
-        raw_dropout_rate=0.3249437779944897,
+    # Configure model with specified hyperparameters (rewritten for requested options)
+    model_config = FlexibleSEConfig(
+        model_name="FlexibleSE",
+        n_filters=[64, 128],
+        kernel_sizes=[(60, 2), (12, 4)],
+        strides=[(8, 2), (6, 3)],
+        paddings=[(5, 1), (2, 1)],
+        activation="leaky_relu",
+        reduction_ratio=32,
+        norm_type="batch",
+        dropout_rate=0.2096159549019644,
         use_se_blocks=False,
-        reduction_ratio=16,
-        # Spectral branch parameters
-        n_spectral_features=16,
-        spectral_hidden_size=32,
-        spectral_norm_type="none",
-        spectral_dropout_rate=0.4016707169576863,
-        # Fusion parameters
-        concat_dropout_rate=0.32291692046947057,
-        fusion_hidden_size=256,
-        fusion_norm_enabled=True,
-        # Shared/other settings
-        activation="gelu",
-        gap_length=8,
+        input_shape=(1000, 68),
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=0.0008690440561214024,
-        weight_decay=2.3569982397796884e-05,
+        learning_rate=0.008412123551225226,
+        weight_decay=1.4050857199832215e-06,
         use_cosine_annealing=False,
     )
 
@@ -252,7 +244,7 @@ def main() -> None:
 
     # Specify which dataset category to train on
     # Options: 'poctep', 'hurh', 'meg', 'eeg', 'all'
-    training_category = "poctep"  # Change this to train on different categories
+    training_category = "all"  # Change this to train on different categories
 
     # Configure dataset - should match the training category
     # For single datasets, use just that dataset name
@@ -267,11 +259,10 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown training category: {training_category}")
 
-    dataset_config = MultiDatasetConfig(
+    dataset_config = RawDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=dataset_names,
-        raw_normalization="dataset",
-        spectral_normalization="standard",
+        raw_normalization="subject",
     )
 
     run_config = RunConfig(
@@ -280,7 +271,7 @@ def main() -> None:
         criterion_config=criterion_config,
         dataset_config=dataset_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
-        batch_size=64,
+        batch_size=128,
         max_epochs=50,
         patience=10,
         min_delta=0.001,
