@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from loguru import logger
 
 from core.schemas import RawDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
+from models.shallow_concatter_se import ShallowConcatterSEConfig
 from models.squeezer import FlexibleSEConfig
 from core.logging import make_logger, Logger
 from core.builders import build_dataset
@@ -216,24 +217,25 @@ def train_and_evaluate(
 def main() -> None:
     """Main entry point."""
 
-    # Configure model with specified hyperparameters (rewritten for requested options)
+    # Configure model with requested hyperparameters (from command-line options)
+    # --activation=leaky_relu --architecture=balanced_3layer --batch_size=64 --dropout_rate=0.25047434239185595 --learning_rate=0.005400434790402595 --norm_type=group --raw_normalization=control-global --reduction_ratio=32 --use_se_blocks=False --weight_decay=0.0004147760689219528
+
     model_config = FlexibleSEConfig(
         model_name="FlexibleSE",
-        n_filters=[64, 128],
-        kernel_sizes=[(60, 2), (12, 4)],
-        strides=[(8, 2), (6, 3)],
-        paddings=[(5, 1), (2, 1)],
-        activation="leaky_relu",
-        reduction_ratio=32,
-        norm_type="batch",
-        dropout_rate=0.2096159549019644,
         use_se_blocks=False,
-        input_shape=(1000, 68),
+        reduction_ratio=32,
+        n_filters=[64, 128, 256],
+        kernel_sizes=[(60, 2), (12, 4), (3, 3)],
+        strides=[(8, 2), (6, 3), (2, 2)],
+        paddings=[(5, 1), (2, 1), (1, 1)],
+        norm_type="group",
+        dropout_rate=0.25047434239185595,
+        activation="leaky_relu",
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=0.008412123551225226,
-        weight_decay=1.4050857199832215e-06,
+        learning_rate=0.005400434790402595,
+        weight_decay=0.0004147760689219528,
         use_cosine_annealing=False,
     )
 
@@ -242,9 +244,9 @@ def main() -> None:
         pos_weight_value=1.0,
     )
 
-    # Specify which dataset category to train on
+    # Specify dataset category to train on (change as needed)
     # Options: 'poctep', 'hurh', 'meg', 'eeg', 'all'
-    training_category = "all"  # Change this to train on different categories
+    training_category = "meg"  # Change this to switch training dataset
 
     # Configure dataset - should match the training category
     # For single datasets, use just that dataset name
@@ -262,7 +264,7 @@ def main() -> None:
     dataset_config = RawDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=dataset_names,
-        raw_normalization="subject",
+        raw_normalization="control-global",
     )
 
     run_config = RunConfig(
@@ -271,7 +273,7 @@ def main() -> None:
         criterion_config=criterion_config,
         dataset_config=dataset_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
-        batch_size=128,
+        batch_size=64,
         max_epochs=50,
         patience=10,
         min_delta=0.001,
@@ -279,7 +281,7 @@ def main() -> None:
         log_to_wandb=True,
         wandb_init={
             "project": "AD_vs_HC_final_eval",
-            "run_name": f"train_on_{training_category}_multi",
+            "run_name": f"train_on_{training_category}_raw",
         },
     )
 
