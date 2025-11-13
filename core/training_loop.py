@@ -12,7 +12,7 @@ from sklearn.metrics import ( # type: ignore
     cohen_kappa_score,
 )
 
-def _unpack_batch(batch: tuple, device: torch.device) -> tuple[torch.Tensor | tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
+def _unpack_batch(batch: tuple, device: torch.device, tri_class_it: bool = False) -> tuple[torch.Tensor | tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
     """Unpack batch and move to device. Handles both (x, y) and ((x_raw, x_spectral), y) formats."""
     data_or_tuple, target = batch  # type: ignore
     
@@ -21,7 +21,9 @@ def _unpack_batch(batch: tuple, device: torch.device) -> tuple[torch.Tensor | tu
     else:
         data = data_or_tuple.to(device)
     
-    target = target.to(device).float()
+    target = target.to(device)
+    if not tri_class_it:
+        target = target.float()
     return data, target
 
 # Training config consts (shouldn't be changed often)
@@ -58,6 +60,7 @@ def one_epoch(
     train_loader: DataLoader,
     validation_loader: DataLoader,
     device: torch.device,
+    tri_class_it: bool = False,
 ) -> OneEpochResults:
     """
     One epoch of training, plus a validation step for it.
@@ -87,13 +90,17 @@ def one_epoch(
     epoch_start_time = time.time()
     batch_durations: list[float] = []
 
-    for batch_idx, batch in enumerate(train_loader): # TODO: it could be interesting to get metrics 
+    for batch in train_loader: # TODO: it could be interesting to get metrics 
         batch_start_time = time.time()
         # on a batch level. maybe later.
-        data, target = _unpack_batch(batch, device)
-        logits = model(data).squeeze(1) # well, i don't usually put the sigmoid on the model.
-        loss = criterion(logits, target) # im kind of expecting that this will be BCEWithLogitsLoss. i 
-        # should probably check what happens if it's not.
+        data, target = _unpack_batch(batch, device, tri_class_it)
+
+        if tri_class_it:
+            logits = model(data) # (batch_size, 3)
+            loss = criterion(logits, target.long()) # CrossEntropyLoss
+        else:
+            logits = model(data).squeeze(1) # (batch_size, )
+            loss = criterion(logits, target) # BCEWithLogitsLoss
 
         optimizer.zero_grad()
         loss.backward()
@@ -115,9 +122,14 @@ def one_epoch(
                 raise UnefficientRun("Average batch time exceeds threshold. Aborting run.")
 
         epoch_loss += loss.item()
-        probabilities = torch.sigmoid(logits)
-        predictions = (probabilities > 0.5).float()
-        epoch_correct += (predictions == target).sum().item()
+        if tri_class_it:
+            probabilities = torch.softmax(logits, dim=1)
+            predictions = torch.argmax(probabilities, dim=1)
+        else:
+            probabilities = torch.sigmoid(logits)
+            predictions = (probabilities > 0.5).float()
+
+        epoch_correct += int((predictions == target).sum().item())
         epoch_total += target.size(0)
 
     avg_loss = epoch_loss / len(train_loader)
@@ -134,20 +146,30 @@ def one_epoch(
 
     with torch.no_grad():
         for batch in validation_loader:
-            data, target = _unpack_batch(batch, device)
-            logits = model(data).squeeze(1)
+            data, target = _unpack_batch(batch, device, tri_class_it)
+            if tri_class_it:
+                logits = model(data) # (batch_size, 3)
+            else:
+                logits = model(data).squeeze(1) # (batch_size, )
 
-            loss = criterion(logits, target)
+            if tri_class_it:
+                loss = criterion(logits, target.long()) # CrossEntropyLoss
+            else:
+                loss = criterion(logits, target) # BCEWithLogitsLoss
+
             val_loss += loss.item()
 
-            probabilities = torch.sigmoid(logits)
-            predictions = (probabilities > 0.5).float() # this is quite 
-            # arbitrary, im just picking .5. 
+            if tri_class_it:
+                probabilities = torch.softmax(logits, dim=1)
+                predictions = torch.argmax(probabilities, dim=1)
+            else:
+                probabilities = torch.sigmoid(logits)
+                predictions = (probabilities > 0.5).float() # this is quite arbitrary, im just picking .5. 
 
             y_pred_list.extend(predictions.cpu().numpy())
             y_true_list.extend(target.cpu().numpy())
 
-            val_correct += (predictions == target).sum().item()
+            val_correct += int((predictions == target).sum().item())
             val_total += target.size(0)
 
     avg_val_loss = val_loss / len(validation_loader)
@@ -161,9 +183,14 @@ def one_epoch(
         logger.warning(f"Epoch took {epoch_time:.2f} seconds (>{MAX_EPOCH_ALLOWED_TIME}s). Aborting run.")
         raise UnefficientRun("Epoch took too long to process. Aborting run.")
 
-    val_f1 = f1_score(y_true, y_pred)
-    val_mcc = matthews_corrcoef(y_true, y_pred)
-    val_kappa = cohen_kappa_score(y_true, y_pred)
+    if tri_class_it:
+        val_f1 = f1_score(y_true, y_pred, average='macro')
+        val_mcc = matthews_corrcoef(y_true, y_pred)
+        val_kappa = cohen_kappa_score(y_true, y_pred)
+    else:
+        val_f1 = f1_score(y_true, y_pred)
+        val_mcc = matthews_corrcoef(y_true, y_pred)
+        val_kappa = cohen_kappa_score(y_true, y_pred)
 
     # This will return a successful epoch. Early stopping will be handled one layer outside.
     return OneEpochResults(

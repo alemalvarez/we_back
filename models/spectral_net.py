@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from typing import List
 from core.schemas import NetworkConfig
-
+from loguru import logger
 
 class SpectralNetConfig(NetworkConfig):
     model_name: str = "SpectralNet"
@@ -46,6 +46,7 @@ class AdvancedSpectralNetConfig(NetworkConfig):
 class AdvancedSpectralNet(nn.Module):
     def __init__(self,
         config: AdvancedSpectralNetConfig,
+        tri_class_it: bool = False,
     ):
         super(AdvancedSpectralNet, self).__init__()
         
@@ -72,7 +73,10 @@ class AdvancedSpectralNet(nn.Module):
             layers.append(nn.BatchNorm1d(config.hidden_2_size))
         layers.append(act)
         layers.append(nn.Dropout(config.dropout_rate))
-        layers.append(nn.Linear(config.hidden_2_size, 1))
+        if tri_class_it: # Tri-class classification
+            layers.append(nn.Linear(config.hidden_2_size, 3))
+        else:
+            layers.append(nn.Linear(config.hidden_2_size, 1))
 
         self.network = nn.Sequential(*layers)
 

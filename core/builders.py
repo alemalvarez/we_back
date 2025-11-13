@@ -14,8 +14,9 @@ from core.raw_dataset import RawDataset
 from models.squeezer import DeeperSE, FlexibleSE
 from models.shallow_concatter import ShallowerConcatter
 from models.shallow_concatter_se import ShallowConcatterSE
+from loguru import logger
 
-def build_model(config: NetworkConfig) -> nn.Module: 
+def build_model(config: NetworkConfig, tri_class_it: bool = False) -> nn.Module: 
     name_class_map = {
         "DeeperCustom": DeeperCustom,
         "Deeper2D": Deeper2D,
@@ -31,7 +32,7 @@ def build_model(config: NetworkConfig) -> nn.Module:
         "ShallowerConcatter": ShallowerConcatter,
         "ShallowConcatterSE": ShallowConcatterSE,
     }
-    return name_class_map[config.model_name](config)
+    return name_class_map[config.model_name](config, tri_class_it=tri_class_it)
 
 def build_optimizer(config: OptimizerConfig, model: nn.Module) -> optim.Optimizer:
     if config.weight_decay is not None:
@@ -45,7 +46,10 @@ def build_scheduler(config: OptimizerConfig, optimizer: optim.Optimizer) -> opti
     else:
         return None
 
-def build_criterion(config: CriterionConfig, dataset_pos_neg: tuple[int, int]) -> nn.Module:
+def build_criterion(config: CriterionConfig, dataset_pos_neg: tuple[int, int], tri_class_it: bool = False) -> nn.Module:
+    if tri_class_it:
+        logger.warning("[TRIClass] This has to be implemented!")
+        return nn.CrossEntropyLoss()
     if config.pos_weight_type == 'fixed':
         return nn.BCEWithLogitsLoss(pos_weight=torch.tensor(config.pos_weight_value))
     else:
@@ -57,7 +61,8 @@ def build_dataset(
     subjects_path: Optional[str] = None, 
     subjects_list: Optional[List[str]] = None, 
     validation: bool = False,
-    norm_stats: Optional[NormalizationStats] = None
+    norm_stats: Optional[NormalizationStats] = None,
+    tri_class_it: bool = False,
 ) -> Dataset:
     if isinstance(config, SpectralDatasetConfig):
         return SpectralDataset(
@@ -65,7 +70,8 @@ def build_dataset(
             subjects_path,
             config.spectral_normalization,
             subjects_list,
-            norm_stats
+            norm_stats,
+            tri_class_it
         )
     elif isinstance(config, MultiDatasetConfig):
         return MultiDataset(
@@ -74,7 +80,8 @@ def build_dataset(
             config.raw_normalization,
             config.spectral_normalization,
             subjects_list,
-            norm_stats
+            norm_stats,
+            tri_class_it
         )
     else:
         assert isinstance(config, RawDatasetConfig)
@@ -87,7 +94,8 @@ def build_dataset(
                 augment_prob=config.augment_prob,
                 noise_std=config.noise_std,
                 subjects_list=subjects_list,
-                norm_stats=norm_stats
+                norm_stats=norm_stats,
+                tri_class_it=tri_class_it
             )
         else:
             return RawDataset(
@@ -98,5 +106,6 @@ def build_dataset(
                 augment_prob=config.augment_prob,
                 noise_std=config.noise_std,
                 subjects_list=subjects_list,
-                norm_stats=norm_stats
+                norm_stats=norm_stats,
+                tri_class_it=tri_class_it
             )

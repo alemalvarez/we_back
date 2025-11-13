@@ -28,7 +28,9 @@ class RawDataset(Dataset):
         noise_std: float = 0.1,
         subjects_list: Optional[List[str]] = None,
         norm_stats: Optional[NormalizationStats] = None,
+        tri_class_it: bool = False,
     ):
+        self.tri_class_it = tri_class_it
         if subjects_list is not None:
             logger.info(f"Using subjects_list with {len(subjects_list)} subjects")
             self.subject_ids = subjects_list
@@ -430,7 +432,7 @@ class RawDataset(Dataset):
             
             for seg_idx in range(n_segments):
                 features_list.append(data[seg_idx, :, :])
-                labels_list.append(0 if category == 'HC' else 1)
+                labels_list.append(self._get_labels(category))
                 self.sample_to_subject.append(subj_key)
 
         # Convert to torch tensors with proper data types
@@ -440,6 +442,11 @@ class RawDataset(Dataset):
         logger.debug(f"Mean after normalization: {self.samples.mean()}")
         logger.debug(f"Std after normalization: {self.samples.std()}")
 
+    def _get_labels(self, category: str) -> int:
+        if self.tri_class_it:
+            return 0 if category == 'HC' else 1 if category == 'MCI' else 2
+        else:
+            return 0 if category == 'HC' else 1
 
     def __len__(self):
         return len(self.samples)

@@ -24,7 +24,9 @@ class MultiDataset(Dataset):
         normalize_spectral: Literal['min-max', 'standard', 'none'] = 'standard',
         subjects_list: Optional[List[str]] = None,
         norm_stats: Optional[NormalizationStats] = None,
+        tri_class_it: bool = False,
     ):
+        self.tri_class_it = tri_class_it
         if subjects_list is not None:
             logger.info(f"Using subjects_list with {len(subjects_list)} subjects")
             self.subject_ids = subjects_list
@@ -423,7 +425,7 @@ class MultiDataset(Dataset):
                     ]
                     spectral_features_list.append(features)
                     
-                    labels_list.append(0 if category == 'HC' else 1)
+                    labels_list.append(self._get_labels(category))
                     self.sample_to_subject.append(subj_key)
 
         # Convert to tensors
@@ -473,6 +475,12 @@ class MultiDataset(Dataset):
 
         logger.debug(f"Raw samples mean: {self.raw_samples.mean()}, std: {self.raw_samples.std()}")
         logger.debug(f"Spectral features mean: {self.spectral_features.mean()}, std: {self.spectral_features.std()}")
+
+    def _get_labels(self, category: str) -> int:
+        if self.tri_class_it:
+            return 0 if category == 'HC' else 1 if category == 'MCI' else 2
+        else:
+            return 0 if category == 'HC' else 1
 
     def __len__(self):
         return len(self.labels)

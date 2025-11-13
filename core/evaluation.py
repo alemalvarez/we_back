@@ -6,6 +6,7 @@ from typing import Mapping, Optional, Dict, List
 import numpy as np
 import torch
 import torch.nn as nn
+from core.schemas import RunConfig
 from torch.utils.data import DataLoader, Dataset
 from sklearn.metrics import (  # type: ignore
     accuracy_score,
@@ -28,7 +29,7 @@ class EvaluationResult:
     best_threshold: float
     per_subject: Optional[Dict[str, Dict[str, int]]] = None
 
-def _unpack_batch(batch: tuple, device: torch.device) -> tuple[torch.Tensor | tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
+def _unpack_batch(batch: tuple, device: torch.device, tri_class_it: bool = False) -> tuple[torch.Tensor | tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
     """Unpack batch and move to device. Handles both (x, y) and ((x_raw, x_spectral), y) formats."""
     data_or_tuple, target = batch  # type: ignore
     
@@ -37,7 +38,9 @@ def _unpack_batch(batch: tuple, device: torch.device) -> tuple[torch.Tensor | tu
     else:
         data = data_or_tuple.to(device)
     
-    target = target.to(device).float()
+    target = target.to(device)
+    if not tri_class_it:
+        target = target.float()
     return data, target
 
 def evaluate_dataset(
@@ -50,7 +53,7 @@ def evaluate_dataset(
     logger_sink: Optional[Logger] = None,
     prefix: str = "val",
     fixed_threshold: Optional[float] = None,
-
+    tri_class_it: bool = False,
 ) -> EvaluationResult:
     """Run a comprehensive evaluation on a dataset.
 
@@ -85,19 +88,27 @@ def evaluate_dataset(
 
     with torch.no_grad():
         for batch_idx, batch in enumerate(loader):
-            data, target = _unpack_batch(batch, device)
+            data, target = _unpack_batch(batch, device, tri_class_it)
 
-            logits = model(data).squeeze(1)
-            outputs = torch.sigmoid(logits)
+            if tri_class_it:
+                logits = model(data) # (batch_size, 3)
+                outputs = torch.softmax(logits, dim=1)
+            else:
+                logits = model(data).squeeze(1) # (batch_size, )
+                outputs = torch.sigmoid(logits)
 
             if criterion is not None:
-                loss = criterion(logits, target)
+                if tri_class_it:
+                    loss = criterion(logits, target.long()) # CrossEntropyLoss
+                else:
+                    loss = criterion(logits, target) # BCEWithLogitsLoss
                 total_loss += float(loss.item())
 
             proba_np = outputs.cpu().numpy()
             target_np = target.cpu().numpy()
             y_pred_proba_list.extend(proba_np)
             y_true_list.extend(target_np)
+
             if subjects is not None:
                 # Reconstruct per-sample subjects from dataset
                 start = batch_idx * loader.batch_size  # type: ignore
@@ -117,13 +128,21 @@ def evaluate_dataset(
 
     # ROC AUC over probabilities
     try:
-        metrics[f"{prefix}/final_roc_auc"] = float(roc_auc_score(y_true, y_pred_proba))
+        if tri_class_it:
+            metrics[f"{prefix}/final_roc_auc"] = float(roc_auc_score(y_true, y_pred_proba, multi_class='ovr', average='macro'))
+        else:
+            metrics[f"{prefix}/final_roc_auc"] = float(roc_auc_score(y_true, y_pred_proba))
     except Exception:
         metrics[f"{prefix}/final_roc_auc"] = float("nan")
 
     # Threshold search using MCC as objective (or use fixed threshold)
-    if fixed_threshold is not None:
+    if tri_class_it:
+        # No threshold search for tri-class, use argmax
+        y_pred = np.argmax(y_pred_proba, axis=1)
+        best_threshold = float('nan')
+    elif fixed_threshold is not None:
         best_threshold = fixed_threshold
+        y_pred = (y_pred_proba > best_threshold).astype(int)
     else:
         precisions, recalls, thresholds = precision_recall_curve(y_true, y_pred_proba)
         if thresholds.size == 0:
@@ -138,16 +157,24 @@ def evaluate_dataset(
                     mccs.append(-1.0)
             best_idx = int(np.argmax(np.array(mccs)))
             best_threshold = float(thresholds[best_idx])
-
-    y_pred = (y_pred_proba > best_threshold).astype(int)
+        y_pred = (y_pred_proba > best_threshold).astype(int)
 
     metrics[f"{prefix}/final_accuracy"] = float(accuracy_score(y_true, y_pred))
-    metrics[f"{prefix}/final_f1"] = float(f1_score(y_true, y_pred))
-    metrics[f"{prefix}/final_precision"] = float(precision_score(y_true, y_pred))
-    metrics[f"{prefix}/final_recall"] = float(recall_score(y_true, y_pred))
+    
+    if tri_class_it:
+        metrics[f"{prefix}/final_f1"] = float(f1_score(y_true, y_pred, average='macro'))
+        metrics[f"{prefix}/final_precision"] = float(precision_score(y_true, y_pred, average='macro', zero_division=0))
+        metrics[f"{prefix}/final_recall"] = float(recall_score(y_true, y_pred, average='macro', zero_division=0))
+    else:
+        metrics[f"{prefix}/final_f1"] = float(f1_score(y_true, y_pred))
+        metrics[f"{prefix}/final_precision"] = float(precision_score(y_true, y_pred))
+        metrics[f"{prefix}/final_recall"] = float(recall_score(y_true, y_pred))
+    
     metrics[f"{prefix}/final_mcc"] = float(matthews_corrcoef(y_true, y_pred))
     metrics[f"{prefix}/final_kappa"] = float(cohen_kappa_score(y_true, y_pred))
-    metrics[f"{prefix}/final_best_threshold"] = best_threshold
+    
+    if not tri_class_it:
+        metrics[f"{prefix}/final_best_threshold"] = best_threshold
 
     # Optional per-subject breakdown
     per_subject: Optional[Dict[str, Dict[str, int]]] = None
@@ -174,7 +201,7 @@ def evaluate_with_config(
     *,
     model: nn.Module,
     dataset: Dataset,
-    run_config,
+    run_config: RunConfig,
     logger_sink: Optional[Logger] = None,
     prefix: str = "val",
 ):
@@ -185,7 +212,7 @@ def evaluate_with_config(
     try:
         from core.builders import build_criterion  # local import to avoid cycles
         from core.runner import _count_pos_neg  # reuse helper
-        criterion = build_criterion(run_config.criterion_config, _count_pos_neg(dataset))
+        criterion = build_criterion(run_config.criterion_config, _count_pos_neg(dataset), tri_class_it=run_config.tri_class_it)
     except Exception:
         criterion = None
 
@@ -197,6 +224,7 @@ def evaluate_with_config(
         criterion=criterion,
         logger_sink=logger_sink,
         prefix=prefix,
+        tri_class_it=run_config.tri_class_it
     )
 
 

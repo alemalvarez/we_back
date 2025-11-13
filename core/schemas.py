@@ -218,6 +218,7 @@ class RunConfig(WarnUnsetDefaultsModel):
     early_stopping_metric: Optional[Literal['loss', 'f1', 'mcc', 'kappa']] = 'loss' # loss is generaly recommended.
     log_to_wandb: bool = False
     wandb_init: Optional[dict] = None
+    tri_class_it: bool = False # GLOBAL FLAG FOR TRI-CLASS CLASSIFICATION
     
     @model_serializer(mode='wrap')
     def _serialize_with_actual_types(self, serializer, info):

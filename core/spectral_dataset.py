@@ -9,12 +9,14 @@ class SpectralDataset(Dataset):
     norm_stats: Optional[NormalizationStats]
     
     def __init__(self, 
-    h5_file_path: str, 
-    subjects_txt_path: Optional[str] = None,
-    normalize: Literal['min-max', 'standard', 'none'] = 'none',
-    subjects_list: Optional[List[str]] = None,
-    norm_stats: Optional[NormalizationStats] = None,
+        h5_file_path: str, 
+        subjects_txt_path: Optional[str] = None,
+        normalize: Literal['min-max', 'standard', 'none'] = 'none',
+        subjects_list: Optional[List[str]] = None,
+        norm_stats: Optional[NormalizationStats] = None,
+        tri_class_it: bool = False,
     ):
+        self.tri_class_it = tri_class_it
         if subjects_list:
             logger.info(f"Using provided subjects_list with {len(subjects_list)} subjects")
             self.subject_ids = subjects_list
@@ -61,7 +63,7 @@ class SpectralDataset(Dataset):
                     ]
 
                     features_list.append(features)
-                    labels_list.append(0 if subject.attrs['category'] == 'HC' else 1)
+                    labels_list.append(self._get_labels(subject.attrs['category']))
                     self.sample_to_subject.append(subj_key)
 
         # Convert to tensors
@@ -111,6 +113,12 @@ class SpectralDataset(Dataset):
 
         logger.debug(f"Mean after normalization: {self.features.mean()}")
         logger.debug(f"Std after normalization: {self.features.std()}")
+
+    def _get_labels(self, category: str) -> int:
+        if self.tri_class_it:
+            return 0 if category == 'HC' else 1 if category == 'MCI' else 2
+        else:
+            return 0 if category == 'HC' else 1
 
     def __len__(self):
         return len(self.features)

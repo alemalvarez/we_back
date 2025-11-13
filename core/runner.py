@@ -49,12 +49,12 @@ def run(
     train_loader = DataLoader(training_dataset, batch_size=config.batch_size, shuffle=True, pin_memory=True, drop_last=True)
     validation_loader = DataLoader(validation_dataset, batch_size=config.batch_size, shuffle=False, pin_memory=True)
 
-    model = build_model(config.network_config)
+    model = build_model(config.network_config, tri_class_it=config.tri_class_it)
     model = model.to(device)
 
     optimizer = build_optimizer(config.optimizer_config, model)
     scheduler = build_scheduler(config.optimizer_config, optimizer)
-    criterion = build_criterion(config.criterion_config, _count_pos_neg(training_dataset))
+    criterion = build_criterion(config.criterion_config, _count_pos_neg(training_dataset), tri_class_it=config.tri_class_it)
     magic_logger = logger_sink or make_logger(wandb_enabled=config.log_to_wandb, wandb_init=config.wandb_init)
     magic_logger.watch(model)
 
@@ -85,6 +85,7 @@ def run(
             train_loader,
             validation_loader,
             device,
+            tri_class_it=config.tri_class_it
         )
 
         logger.info(f"Epoch {epoch+1}/{config.max_epochs} | "

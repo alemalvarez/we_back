@@ -173,7 +173,8 @@ def run_cv(
         training_dataset = build_dataset(
             run_config.dataset_config,
             subjects_list=train_fold,
-            validation=False
+            validation=False,
+            tri_class_it=run_config.tri_class_it
         )
         
         # Extract normalization stats from training dataset
@@ -183,7 +184,8 @@ def run_cv(
             run_config.dataset_config, 
             subjects_list=val_fold,
             validation=True,
-            norm_stats=train_norm_stats
+            norm_stats=train_norm_stats,
+            tri_class_it=run_config.tri_class_it
         )
 
         trained_model = run_single(
