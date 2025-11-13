@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple
 from dotenv import load_dotenv
 from loguru import logger
 
-from core.schemas import RawDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
+from core.schemas import RawDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig, MultiDatasetConfig
 from models.shallow_concatter_se import ShallowConcatterSEConfig
 from models.squeezer import FlexibleSEConfig
 from core.logging import make_logger, Logger
@@ -218,24 +218,32 @@ def main() -> None:
     """Main entry point."""
 
     # Configure model with requested hyperparameters (from command-line options)
-    # --activation=leaky_relu --architecture=balanced_3layer --batch_size=64 --dropout_rate=0.25047434239185595 --learning_rate=0.005400434790402595 --norm_type=group --raw_normalization=control-global --reduction_ratio=32 --use_se_blocks=False --weight_decay=0.0004147760689219528
+    # --activation=relu --architecture=wide_2layer --batch_size=128 --concat_dropout_rate=0.4040090251396535 --fusion_hidden_size=256 --fusion_norm_enabled=True --gap_length=4 --learning_rate=1.0320918986879036e-05 --raw_dropout_rate=0.3619070629603379 --raw_norm_type=batch --raw_normalization=sample-channel --reduction_ratio=8 --spectral_dropout_rate=0.4979032474037014 --spectral_hidden_size=128 --spectral_norm_type=batch --use_se_blocks=True --weight_decay=0.00018851087136721956
 
-    model_config = FlexibleSEConfig(
-        model_name="FlexibleSE",
-        use_se_blocks=False,
-        reduction_ratio=32,
-        n_filters=[64, 128, 256],
-        kernel_sizes=[(60, 2), (12, 4), (3, 3)],
-        strides=[(8, 2), (6, 3), (2, 2)],
-        paddings=[(5, 1), (2, 1), (1, 1)],
-        norm_type="group",
-        dropout_rate=0.25047434239185595,
-        activation="leaky_relu",
+    model_config = ShallowConcatterSEConfig(
+        model_name="ShallowConcatterSE",
+        use_se_blocks=True,
+        reduction_ratio=8,
+        n_filters=[256, 256],
+        kernel_sizes=[(80, 2), (8, 2)],
+        strides=[(4, 2), (2, 2)],
+        paddings=[(6, 1), (1, 1)],
+        raw_norm_type="batch",
+        raw_dropout_rate=0.3619070629603379,
+        spectral_norm_type="batch",
+        spectral_dropout_rate=0.4979032474037014,
+        concat_dropout_rate=0.4040090251396535,
+        spectral_hidden_size=128,
+        fusion_hidden_size=256,
+        fusion_norm_enabled=True,
+        gap_length=4,
+        activation="relu",
+        n_spectral_features=16,
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=0.005400434790402595,
-        weight_decay=0.0004147760689219528,
+        learning_rate=1.0320918986879036e-05,
+        weight_decay=0.00018851087136721956,
         use_cosine_annealing=False,
     )
 
@@ -246,7 +254,7 @@ def main() -> None:
 
     # Specify dataset category to train on (change as needed)
     # Options: 'poctep', 'hurh', 'meg', 'eeg', 'all'
-    training_category = "meg"  # Change this to switch training dataset
+    training_category = "all"  # Change this to switch training dataset
 
     # Configure dataset - should match the training category
     # For single datasets, use just that dataset name
@@ -261,10 +269,10 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown training category: {training_category}")
 
-    dataset_config = RawDatasetConfig(
+    dataset_config = MultiDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=dataset_names,
-        raw_normalization="control-global",
+        raw_normalization="sample-channel",
     )
 
     run_config = RunConfig(
@@ -273,7 +281,7 @@ def main() -> None:
         criterion_config=criterion_config,
         dataset_config=dataset_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
-        batch_size=64,
+        batch_size=128,
         max_epochs=50,
         patience=10,
         min_delta=0.001,
@@ -281,7 +289,7 @@ def main() -> None:
         log_to_wandb=True,
         wandb_init={
             "project": "AD_vs_HC_final_eval",
-            "run_name": f"train_on_{training_category}_raw",
+            "run_name": f"train_on_{training_category}_multi",
         },
     )
 
