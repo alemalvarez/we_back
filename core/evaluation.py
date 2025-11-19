@@ -226,6 +226,7 @@ def evaluate_with_config(
         from core.builders import build_criterion  # local import to avoid cycles
         from core.runner import _count_classes  # reuse helper
         criterion = build_criterion(run_config.criterion_config, _count_classes(dataset, tri_class=run_config.tri_class_it), tri_class_it=run_config.tri_class_it)
+        criterion = criterion.to(device)
     except Exception:
         criterion = None
 
