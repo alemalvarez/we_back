@@ -66,32 +66,33 @@ def _compute_subject_level_metrics(
     
     for subject in sorted(all_subjects_data.keys()):
         counts = all_subjects_data[subject]
-        correct = counts.get("correct", 0)
-        wrong = counts.get("wrong", 0)
         
-        if tri_class:
-            # True label: 0=HC, 1=MCI, 2=AD
-            if "HC" in subject:
-                true_label = 0
-            elif "MCI" in subject:
-                true_label = 1
-            else:  # AD, ADMIL, ADMOD
-                true_label = 2
+        # Check if new format (with true_label) or legacy
+        if "true_label" in counts:
+            # New format: use actual prediction counts
+            true_label = counts["true_label"]
+            
+            if tri_class:
+                pred_counts = [counts["pred_HC"], counts["pred_MCI"], counts["pred_AD"]]
+                pred_label = pred_counts.index(max(pred_counts))
+            else:
+                pred_label = 0 if counts["pred_HC"] > counts["pred_AD"] else 1
         else:
-            # Binary: 0=HC, 1=AD
-            true_label = 0 if "HC" in subject else 1
-        
-        # Predicted label: majority vote
-        # If majority of segments match the true label, predict true label
-        # Otherwise, predict the opposite (for binary) or wrong label (for tri-class)
-        if correct > wrong:
-            pred_label = true_label
-        else:
-            # For tri-class, we can't determine which wrong class without more info
-            # This is a limitation of the current per-subject aggregation approach
-            # For now, we mark it as the most common wrong prediction
-            # In practice, this is handled at the segment level
-            pred_label = 1 - true_label if not tri_class else (true_label + 1) % 3
+            # Legacy format: infer from subject name
+            correct = counts.get("correct", 0)
+            wrong = counts.get("wrong", 0)
+            
+            if tri_class:
+                if "HC" in subject:
+                    true_label = 0
+                elif "MCI" in subject:
+                    true_label = 1
+                else:
+                    true_label = 2
+            else:
+                true_label = 0 if "HC" in subject else 1
+            
+            pred_label = true_label if correct > wrong else (1 - true_label if not tri_class else (true_label + 1) % 3)
         
         y_true_subject.append(true_label)
         y_pred_subject.append(pred_label)
@@ -232,7 +233,7 @@ def run_cv(
             logger_sink=magic_logger,
             prefix=f"{fold_prefix}/val",
         )
-        pretty_print_per_subject(eval_res.per_subject, title=f"Fold {fold_idx+1} per-subject")
+        pretty_print_per_subject(eval_res.per_subject, title=f"Fold {fold_idx+1} per-subject", tri_class=run_config.tri_class_it)
 
         fold_metrics.append(eval_res.metrics)
         
@@ -240,9 +241,14 @@ def run_cv(
         if eval_res.per_subject:
             for subject, counts in eval_res.per_subject.items():
                 if subject not in all_subjects_data:
-                    all_subjects_data[subject] = {"correct": 0, "wrong": 0}
-                all_subjects_data[subject]["correct"] += counts.get("correct", 0)
-                all_subjects_data[subject]["wrong"] += counts.get("wrong", 0)
+                    all_subjects_data[subject] = {"true_label": counts["true_label"]}
+                    # Initialize prediction counters
+                    for class_idx in range(3 if run_config.tri_class_it else 2):
+                        all_subjects_data[subject][f"pred_{CLASS_NAMES[class_idx]}"] = 0
+                # Aggregate prediction counts
+                for key in counts:
+                    if key.startswith("pred_"):
+                        all_subjects_data[subject][key] += counts[key]
 
         # Early stopping check based on fold MCC
         if min_fold_mcc is not None:
@@ -295,7 +301,7 @@ def run_cv(
     # Compute and log subject-level metrics
     if all_subjects_data:
         logger.info("=" * 100)
-        pretty_print_per_subject(all_subjects_data, title="Subject-level results across all folds (voting)")
+        pretty_print_per_subject(all_subjects_data, title="Subject-level results across all folds (voting)", tri_class=run_config.tri_class_it)
         
         subject_level_metrics, cm = _compute_subject_level_metrics(all_subjects_data, tri_class=run_config.tri_class_it)
         

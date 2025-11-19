@@ -194,11 +194,14 @@ def evaluate_dataset(
     if subjects is not None:
         per_subject = {}
         for subj, y_t, y_p in zip(subjects, y_true.tolist(), y_pred.tolist()):
-            entry = per_subject.setdefault(subj, {"correct": 0, "wrong": 0})
-            if int(y_t) == int(y_p):
-                entry["correct"] += 1
-            else:
-                entry["wrong"] += 1
+            y_t_int, y_p_int = int(y_t), int(y_p)
+            if subj not in per_subject:
+                per_subject[subj] = {"true_label": y_t_int}
+                # Initialize prediction counters
+                for class_idx in range(3 if tri_class_it else 2):
+                    per_subject[subj][f"pred_{CLASS_NAMES[class_idx]}"] = 0
+            # Increment prediction count
+            per_subject[subj][f"pred_{CLASS_NAMES[y_p_int]}"] += 1
 
     # Optional logging to the unified logger
     if logger_sink is not None:
@@ -242,8 +245,8 @@ def evaluate_with_config(
     )
 
 
-def pretty_print_per_subject(per_subject: Optional[Dict[str, Dict[str, int]]], *, title: str = "Per-subject results") -> None:
-    """Pretty-print per-subject correct/wrong counts to console.
+def pretty_print_per_subject(per_subject: Optional[Dict[str, Dict[str, int]]], *, title: str = "Per-subject results", tri_class: bool = False) -> None:
+    """Pretty-print per-subject prediction distribution to console.
 
     This intentionally does not log to W&B, since the breakdown isn't suitable
     as scalar metrics. Uses loguru's console logger.
@@ -253,18 +256,59 @@ def pretty_print_per_subject(per_subject: Optional[Dict[str, Dict[str, int]]], *
         return
 
     logger.info(title)
-    logger.info(f"{'Subject':<36}{'Correct':>10}{'Wrong':>10}{'Acc':>8}")
-    logger.info("-" * 64)
-    # Stable order by subject id/name
+    
+    # Determine if using new format
+    first_entry = next(iter(per_subject.values()))
+    is_new_format = "true_label" in first_entry
+    
+    if not is_new_format:
+        # Legacy format fallback
+        logger.info(f"{'Subject':<36}{'Correct':>10}{'Wrong':>10}{'Acc':>8}")
+        logger.info("-" * 64)
+        for subject in sorted(per_subject.keys()):
+            counts = per_subject[subject]
+            correct = int(counts.get("correct", 0))
+            wrong = int(counts.get("wrong", 0))
+            total = max(correct + wrong, 1)
+            acc = correct / total
+            if acc > 0.5:
+                logger.success(f"{subject:<36}{correct:>10}{wrong:>10}{acc:>8.2f}")
+            else:
+                logger.info(f"{subject:<36}{correct:>10}{wrong:>10}{acc:>8.2f}")
+        return
+    
+    # New format with per-class predictions
+    if tri_class:
+        logger.info(f"{'Subject':<36}{'HC':>10}{'MCI':>10}{'AD':>10}{'Acc':>8}")
+        logger.info("-" * 74)
+    else:
+        logger.info(f"{'Subject':<36}{'HC':>10}{'AD':>10}{'Acc':>8}")
+        logger.info("-" * 64)
+    
     for subject in sorted(per_subject.keys()):
         counts = per_subject[subject]
-        correct = int(counts.get("correct", 0))
-        wrong = int(counts.get("wrong", 0))
-        total = max(correct + wrong, 1)
-        acc = correct / total
-        if acc > 0.5:
-            logger.success(f"{subject:<36}{correct:>10}{wrong:>10}{acc:>8.2f}")
+        true_label = counts["true_label"]
+        true_class = CLASS_NAMES[true_label]
+        
+        if tri_class:
+            hc = counts["pred_HC"]
+            mci = counts["pred_MCI"]
+            ad = counts["pred_AD"]
+            total = hc + mci + ad
+            correct = counts[f"pred_{true_class}"]
+            acc = correct / total if total > 0 else 0
+            row = f"{subject:<36}{hc:>10}{mci:>10}{ad:>10}{acc:>8.2f}"
         else:
-            logger.info(f"{subject:<36}{correct:>10}{wrong:>10}{acc:>8.2f}")
+            hc = counts["pred_HC"]
+            ad = counts["pred_AD"]
+            total = hc + ad
+            correct = counts[f"pred_{true_class}"]
+            acc = correct / total if total > 0 else 0
+            row = f"{subject:<36}{hc:>10}{ad:>10}{acc:>8.2f}"
+        
+        if acc > 0.5:
+            logger.success(row)
+        else:
+            logger.info(row)
 
 
