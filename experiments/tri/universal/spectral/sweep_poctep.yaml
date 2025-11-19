@@ -1,6 +1,6 @@
 name: definitive_poctep_spectral_net_sweep
 method: bayes
-project: AD_vs_HC_POCTEP
+project: HC_vs_MCI_vs_AD_POCTEP
 metric:
   name: cv/segment_level_final_f1_mean
   goal: maximize
@@ -31,7 +31,7 @@ parameters:
   activation:
     values: [leaky_relu, gelu, silu]
 
-program: experiments.AD_vs_HC.universal.spectral.sweep
+program: experiments.tri.universal.spectral.sweep
 
 command:
   - ${env}

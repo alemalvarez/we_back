@@ -1,6 +1,6 @@
 name: definitive_eeg_spectral_net_sweep
 method: bayes
-project: AD_vs_HC_EEG
+project: AD_vs_MCI_vs_AD_EEG
 metric:
   name: cv/segment_level_final_f1_mean
   goal: maximize
@@ -34,7 +34,7 @@ parameters:
   batch_size:
     values: [32, 64, 128]
 
-program: experiments.AD_vs_HC.universal.spectral.sweep
+program: experiments.tri.universal.spectral.sweep
 
 command:
   - ${env}

@@ -11,7 +11,7 @@ from core.cv import run_cv
 load_dotenv()
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5")
-SPLITS_JSON_PATH = "experiments/AD_vs_HC/universal/universal_splits.json"
+SPLITS_JSON_PATH = "experiments/tri/universal/universal_splits_tri.json"
 N_FOLDS = 5
 
 def _read_subjects(path: str, dataset_name: str) -> list[str]:
@@ -34,13 +34,10 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         weight_decay=float(cfg.get("weight_decay", 0.0)) if cfg.get("weight_decay") is not None else None,
         use_cosine_annealing=False,
     )
-    criterion_config = CriterionConfig(
-        pos_weight_type='multiplied',
-        pos_weight_value=1.0,
-    )
+    criterion_config = CriterionConfig() # nothing to set for tri-class classification!
     dataset_config = SpectralDatasetConfig(
         h5_file_path=H5_FILE_PATH,
-        dataset_names=["poctep", "hurh", "meg"],
+        dataset_names=["meg"],
         spectral_normalization="standard",
     )
     run_config = RunConfig(
@@ -50,19 +47,20 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         dataset_config=dataset_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
         batch_size=int(cfg.get("batch_size", 32)),
-        max_epochs=50,
+        max_epochs=75,
         patience=10,
         min_delta=0.001,
         early_stopping_metric='loss',
         log_to_wandb=True,
-        wandb_init=None
+        wandb_init=None,
+        tri_class_it=True,
     )
     return run_config
 
 def main() -> None:
     # Expect a W&B agent to have initialized the run; otherwise, init minimally
     if wandb.run is None:
-        wandb.init(project=os.getenv("WANDB_PROJECT", "AD_vs_HC"))
+        wandb.init(project=os.getenv("WANDB_PROJECT", "AD_vs_MCI_vs_AD"))
 
     cfg = wandb.config
 
@@ -79,7 +77,7 @@ def main() -> None:
         n_folds=N_FOLDS,
         run_config=run_config,
         magic_logger=magic_logger,   
-        min_fold_mcc=.30,
+        min_fold_mcc=.20,
     )
 
     magic_logger.finish()

@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split  # type: ignore
 load_dotenv()
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5")
-SPLITS_JSON_PATH = "experiments/AD_vs_HC/universal/universal_splits.json"
+SPLITS_JSON_PATH = "experiments/tri/universal/universal_splits_tri.json"
 
 # Dataset categories
 CATEGORIES = ["poctep", "hurh", "meg", "eeg", "all"]
@@ -289,9 +289,10 @@ def main() -> None:
         early_stopping_metric='loss',
         log_to_wandb=True,
         wandb_init={
-            "project": "AD_vs_HC_final_eval",
+            "project": "AD_vs_MCI_vs_AD_final_eval",
             "run_name": f"train_on_{training_category}_multi",
         },
+        tri_class_it=True,
     )
 
     # Initialize logger
