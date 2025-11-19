@@ -143,13 +143,22 @@ def _compute_subject_level_metrics(
             y_score = []
             for subject in sorted(all_subjects_data.keys()):
                 counts = all_subjects_data[subject]
-                correct = counts.get("correct", 0)
-                wrong = counts.get("wrong", 0)
-                total = correct + wrong
                 
-                true_label = 0 if 'HC' in subject else 1
-                ad_segments = correct if true_label == 1 else wrong
-                confidence_ad = ad_segments / total if total > 0 else 0.5
+                if "true_label" in counts:
+                    # New format: use prediction counts
+                    pred_hc = counts["pred_HC"]
+                    pred_ad = counts["pred_AD"]
+                    total = pred_hc + pred_ad
+                    confidence_ad = pred_ad / total if total > 0 else 0.5
+                else:
+                    # Legacy format
+                    correct = counts.get("correct", 0)
+                    wrong = counts.get("wrong", 0)
+                    total = correct + wrong
+                    true_label = 0 if 'HC' in subject else 1
+                    ad_segments = correct if true_label == 1 else wrong
+                    confidence_ad = ad_segments / total if total > 0 else 0.5
+                
                 y_score.append(confidence_ad)
             
             metrics["cv/subject_level_roc_auc"] = float(roc_auc_score(y_true_np, y_score))

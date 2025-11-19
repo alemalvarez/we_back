@@ -1,0 +1,93 @@
+name: definitive_all_multi_net_sweep
+method: bayes
+project: AD_vs_HC_ALL
+metric:
+  name: cv/segment_level_final_f1_mean
+  goal: maximize
+run_cap: 100
+
+parameters:
+  # Architecture preset (shallow 2-layer configs)
+  architecture:
+    values:
+      - proven_tiny
+      - tiny_2layer
+      - small_2layer
+      - compact_2layer
+      - medium_2layer
+      - wide_2layer
+  
+  # SE block configuration
+  use_se_blocks:
+    values: [true, false]
+  
+  reduction_ratio:
+    values: [8, 16, 32]
+  
+  # Normalization types
+  raw_norm_type:
+    values: [batch, group]
+  
+  spectral_norm_type:
+    values: [batch, group, none]
+  
+  fusion_norm_enabled:
+    values: [true, false]
+  
+  # Dropout rates
+  raw_dropout_rate:
+    distribution: uniform
+    min: 0.2
+    max: 0.5
+  
+  spectral_dropout_rate:
+    distribution: uniform
+    min: 0.2
+    max: 0.5
+  
+  concat_dropout_rate:
+    distribution: uniform
+    min: 0.2
+    max: 0.5
+  
+  # Spectral branch parameters
+  spectral_hidden_size:
+    values: [32, 64, 128]
+  
+  # Fusion parameters
+  fusion_hidden_size:
+    values: [64, 128, 256]
+  
+  gap_length:
+    values: [4, 8]
+  
+  # Training hyperparameters
+  learning_rate:
+    distribution: log_uniform_values
+    min: 1.0e-5
+    max: 1.0e-2
+    
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1.0e-6
+    max: 1.0e-3
+
+  batch_size:
+    values: [32, 64, 128]
+
+  raw_normalization:
+    values: [sample-channel, sample, channel-subject, subject, channel-dataset, dataset, control-channel, control-global]
+  
+  activation:
+    values: [relu, leaky_relu, gelu, silu]
+
+program: experiments.AD_vs_HC.universal.multi.sweep
+
+command:
+  - ${env}
+  - uv
+  - run
+  - -m
+  - ${program}
+  - ${args}
+
