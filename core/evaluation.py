@@ -22,6 +22,8 @@ from loguru import logger
 
 from core.logging import Logger
 
+# Class name mapping for tri-class classification
+CLASS_NAMES = {0: "HC", 1: "MCI", 2: "AD"}
 
 @dataclass
 class EvaluationResult:
@@ -162,9 +164,20 @@ def evaluate_dataset(
     metrics[f"{prefix}/final_accuracy"] = float(accuracy_score(y_true, y_pred))
     
     if tri_class_it:
+        # Macro-averaged metrics
         metrics[f"{prefix}/final_f1"] = float(f1_score(y_true, y_pred, average='macro'))
         metrics[f"{prefix}/final_precision"] = float(precision_score(y_true, y_pred, average='macro', zero_division=0))
         metrics[f"{prefix}/final_recall"] = float(recall_score(y_true, y_pred, average='macro', zero_division=0))
+        
+        # Per-class metrics with human-readable names
+        f1_per_class = f1_score(y_true, y_pred, average=None, zero_division=0)
+        precision_per_class = precision_score(y_true, y_pred, average=None, zero_division=0)
+        recall_per_class = recall_score(y_true, y_pred, average=None, zero_division=0)
+        
+        for class_idx, class_name in CLASS_NAMES.items():
+            metrics[f"{prefix}/final_f1_{class_name}"] = float(f1_per_class[class_idx])
+            metrics[f"{prefix}/final_precision_{class_name}"] = float(precision_per_class[class_idx])
+            metrics[f"{prefix}/final_recall_{class_name}"] = float(recall_per_class[class_idx])
     else:
         metrics[f"{prefix}/final_f1"] = float(f1_score(y_true, y_pred))
         metrics[f"{prefix}/final_precision"] = float(precision_score(y_true, y_pred))
@@ -211,8 +224,8 @@ def evaluate_with_config(
     criterion: Optional[nn.Module] = None
     try:
         from core.builders import build_criterion  # local import to avoid cycles
-        from core.runner import _count_pos_neg  # reuse helper
-        criterion = build_criterion(run_config.criterion_config, _count_pos_neg(dataset), tri_class_it=run_config.tri_class_it)
+        from core.runner import _count_classes  # reuse helper
+        criterion = build_criterion(run_config.criterion_config, _count_classes(dataset, tri_class=run_config.tri_class_it), tri_class_it=run_config.tri_class_it)
     except Exception:
         criterion = None
 

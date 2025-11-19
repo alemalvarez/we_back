@@ -46,14 +46,21 @@ def build_scheduler(config: OptimizerConfig, optimizer: optim.Optimizer) -> opti
     else:
         return None
 
-def build_criterion(config: CriterionConfig, dataset_pos_neg: tuple[int, int], tri_class_it: bool = False) -> nn.Module:
+def build_criterion(config: CriterionConfig, class_counts: tuple[int, ...], tri_class_it: bool = False) -> nn.Module:
     if tri_class_it:
-        logger.warning("[TRIClass] This has to be implemented!")
-        return nn.CrossEntropyLoss()
+        # Calculate inverse frequency weights for balanced tri-class learning
+        total = sum(class_counts)
+        n_classes = len(class_counts)
+        weights = torch.tensor([total / (n_classes * count) for count in class_counts], dtype=torch.float32)
+        logger.info(f"Tri-class weights: HC={weights[0]:.3f}, MCI={weights[1]:.3f}, AD={weights[2]:.3f}")
+        return nn.CrossEntropyLoss(weight=weights)
+    
+    # Binary classification
+    neg_count, pos_count = class_counts
     if config.pos_weight_type == 'fixed':
         return nn.BCEWithLogitsLoss(pos_weight=torch.tensor(config.pos_weight_value))
     else:
-        pos_weight = config.pos_weight_value * (dataset_pos_neg[0] / dataset_pos_neg[1])
+        pos_weight = config.pos_weight_value * (pos_count / neg_count)
         return nn.BCEWithLogitsLoss(pos_weight=torch.tensor(pos_weight))
 
 def build_dataset(

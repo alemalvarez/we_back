@@ -20,19 +20,27 @@ def _get_device() -> torch.device:
         logger.info("Using CPU...")
         return torch.device("cpu")  
 
-def _count_pos_neg(dataset: Dataset) -> tuple[int, int]:
-    # Assumes dataset[i][1] is the label and is 0 or 1 or convertible to int
-    pos = 0
-    neg = 0
+def _count_classes(dataset: Dataset, tri_class: bool = False) -> tuple[int, ...]:
+    """Count samples per class in dataset.
+    
+    Returns:
+        (neg, pos) for binary classification
+        (class_0, class_1, class_2) for tri-class classification
+    """
+    if tri_class:
+        counts = [0, 0, 0]
+    else:
+        counts = [0, 0]
+    
     for i in range(len(dataset)): # type: ignore
         label = dataset[i][1]
         if isinstance(label, torch.Tensor):
-            label = label.item()
-        if int(label) == 1:
-            pos += 1
+            label = int(label.item())
         else:
-            neg += 1
-    return pos, neg
+            label = int(label)
+        counts[label] += 1
+    
+    return tuple(counts)
 
 def run(
     config: RunConfig,
@@ -54,7 +62,8 @@ def run(
 
     optimizer = build_optimizer(config.optimizer_config, model)
     scheduler = build_scheduler(config.optimizer_config, optimizer)
-    criterion = build_criterion(config.criterion_config, _count_pos_neg(training_dataset), tri_class_it=config.tri_class_it)
+    criterion = build_criterion(config.criterion_config, _count_classes(training_dataset, tri_class=config.tri_class_it), tri_class_it=config.tri_class_it)
+    criterion = criterion.to(device)
     magic_logger = logger_sink or make_logger(wandb_enabled=config.log_to_wandb, wandb_init=config.wandb_init)
     magic_logger.watch(model)
 

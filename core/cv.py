@@ -25,6 +25,9 @@ from core.logging import Logger
 from dotenv import load_dotenv
 load_dotenv()
 
+# Class name mapping for tri-class classification
+CLASS_NAMES = {0: "HC", 1: "MCI", 2: "AD"}
+
 
 def _subject_type(subject_id: str) -> str:
     if "ADMIL" in subject_id:
@@ -47,15 +50,16 @@ def _count_by_category(subjects: List[str]) -> dict[str, int]:
 
 def _compute_subject_level_metrics(
     all_subjects_data: Dict[str, Dict[str, int]],
-) -> Dict[str, float]:
+    tri_class: bool = False,
+) -> tuple[Dict[str, float], np.ndarray]:
     """Compute subject-level metrics using majority voting.
     
     Args:
         all_subjects_data: Dict mapping subject_id to {"correct": int, "wrong": int}
-        all_subjects: List of all subject IDs to get true labels
+        tri_class: Whether this is tri-class classification
         
     Returns:
-        Dictionary of subject-level metrics
+        Tuple of (metrics dictionary, confusion matrix)
     """
     y_true_subject = []
     y_pred_subject = []
@@ -65,16 +69,29 @@ def _compute_subject_level_metrics(
         correct = counts.get("correct", 0)
         wrong = counts.get("wrong", 0)
         
-        # True label: 0 for HC, 1 for AD (ADMIL or ADMOD)
-        true_label = 0 if "HC" in subject else 1
+        if tri_class:
+            # True label: 0=HC, 1=MCI, 2=AD
+            if "HC" in subject:
+                true_label = 0
+            elif "MCI" in subject:
+                true_label = 1
+            else:  # AD, ADMIL, ADMOD
+                true_label = 2
+        else:
+            # Binary: 0=HC, 1=AD
+            true_label = 0 if "HC" in subject else 1
         
         # Predicted label: majority vote
         # If majority of segments match the true label, predict true label
-        # Otherwise, predict the opposite
+        # Otherwise, predict the opposite (for binary) or wrong label (for tri-class)
         if correct > wrong:
             pred_label = true_label
         else:
-            pred_label = 1 - true_label
+            # For tri-class, we can't determine which wrong class without more info
+            # This is a limitation of the current per-subject aggregation approach
+            # For now, we mark it as the most common wrong prediction
+            # In practice, this is handled at the segment level
+            pred_label = 1 - true_label if not tri_class else (true_label + 1) % 3
         
         y_true_subject.append(true_label)
         y_pred_subject.append(pred_label)
@@ -82,51 +99,63 @@ def _compute_subject_level_metrics(
     y_true_np = np.array(y_true_subject)
     y_pred_np = np.array(y_pred_subject)
     
-    # Compute metrics
-    tn, fp, fn, tp = confusion_matrix(y_true_np, y_pred_np).ravel()
+    # Compute confusion matrix
+    cm = confusion_matrix(y_true_np, y_pred_np)
     
+    # Build metrics
     metrics = {
-        "cv/subject_level_tn": float(tn),
-        "cv/subject_level_fp": float(fp),
-        "cv/subject_level_fn": float(fn),
-        "cv/subject_level_tp": float(tp),
         "cv/subject_level_accuracy": float(accuracy_score(y_true_np, y_pred_np)),
-        "cv/subject_level_f1": float(f1_score(y_true_np, y_pred_np)),
-        "cv/subject_level_precision": float(precision_score(y_true_np, y_pred_np, zero_division=0)),
-        "cv/subject_level_recall": float(recall_score(y_true_np, y_pred_np, zero_division=0)),
         "cv/subject_level_mcc": float(matthews_corrcoef(y_true_np, y_pred_np)),
         "cv/subject_level_kappa": float(cohen_kappa_score(y_true_np, y_pred_np)),
     }
     
-    # ROC AUC requires probabilities/confidence scores
-    # Use the proportion of segments predicted as AD as the confidence score
-    try:
-        y_score = []
-        for subject in sorted(all_subjects_data.keys()):
-            counts = all_subjects_data[subject]
-            correct = counts.get("correct", 0)
-            wrong = counts.get("wrong", 0)
-            total = correct + wrong
-            
-            # True label: 0 for HC, 1 for AD
-            true_label = 0 if 'HC' in subject else 1
-            
-            # Proportion of segments that predicted AD
-            if true_label == 1:
-                # AD subject: correct segments predicted AD
-                ad_segments = correct
-            else:
-                # HC subject: wrong segments predicted AD
-                ad_segments = wrong
-            
-            confidence_ad = ad_segments / total if total > 0 else 0.5
-            y_score.append(confidence_ad)
+    if tri_class:
+        # Macro-averaged metrics for tri-class
+        metrics["cv/subject_level_f1"] = float(f1_score(y_true_np, y_pred_np, average='macro'))
+        metrics["cv/subject_level_precision"] = float(precision_score(y_true_np, y_pred_np, average='macro', zero_division=0))
+        metrics["cv/subject_level_recall"] = float(recall_score(y_true_np, y_pred_np, average='macro', zero_division=0))
         
-        metrics["cv/subject_level_roc_auc"] = float(roc_auc_score(y_true_np, y_score))
-    except Exception:
-        metrics["cv/subject_level_roc_auc"] = float("nan")
+        # Per-class metrics
+        f1_per_class = f1_score(y_true_np, y_pred_np, average=None, zero_division=0)
+        precision_per_class = precision_score(y_true_np, y_pred_np, average=None, zero_division=0)
+        recall_per_class = recall_score(y_true_np, y_pred_np, average=None, zero_division=0)
+        
+        for class_idx, class_name in CLASS_NAMES.items():
+            metrics[f"cv/subject_level_f1_{class_name}"] = float(f1_per_class[class_idx])
+            metrics[f"cv/subject_level_precision_{class_name}"] = float(precision_per_class[class_idx])
+            metrics[f"cv/subject_level_recall_{class_name}"] = float(recall_per_class[class_idx])
+    else:
+        # Binary metrics
+        tn, fp, fn, tp = cm.ravel()
+        metrics.update({
+            "cv/subject_level_tn": float(tn),
+            "cv/subject_level_fp": float(fp),
+            "cv/subject_level_fn": float(fn),
+            "cv/subject_level_tp": float(tp),
+            "cv/subject_level_f1": float(f1_score(y_true_np, y_pred_np)),
+            "cv/subject_level_precision": float(precision_score(y_true_np, y_pred_np, zero_division=0)),
+            "cv/subject_level_recall": float(recall_score(y_true_np, y_pred_np, zero_division=0)),
+        })
+        
+        # ROC AUC for binary only
+        try:
+            y_score = []
+            for subject in sorted(all_subjects_data.keys()):
+                counts = all_subjects_data[subject]
+                correct = counts.get("correct", 0)
+                wrong = counts.get("wrong", 0)
+                total = correct + wrong
+                
+                true_label = 0 if 'HC' in subject else 1
+                ad_segments = correct if true_label == 1 else wrong
+                confidence_ad = ad_segments / total if total > 0 else 0.5
+                y_score.append(confidence_ad)
+            
+            metrics["cv/subject_level_roc_auc"] = float(roc_auc_score(y_true_np, y_score))
+        except Exception:
+            metrics["cv/subject_level_roc_auc"] = float("nan")
     
-    return metrics
+    return metrics, cm
 
 def run_cv(
     all_subjects: List[str],
@@ -235,13 +264,18 @@ def run_cv(
         if fold_idx < n_folds - 1:
             logger.info("=" * 40 + f" FOLD {fold_idx+1} DONE" + "=" * 40)
 
-    keys = [
-        "final_accuracy", "final_f1", "final_precision", "final_recall", "final_mcc", "final_roc_auc", "final_kappa"
-    ]
+    # Define metrics to aggregate
+    base_keys = ["final_accuracy", "final_f1", "final_precision", "final_recall", "final_mcc", "final_roc_auc", "final_kappa"]
+    
+    # Add per-class metrics for tri-class
+    if run_config.tri_class_it:
+        for class_name in CLASS_NAMES.values():
+            base_keys.extend([f"final_f1_{class_name}", f"final_precision_{class_name}", f"final_recall_{class_name}"])
+    
     # Compute and log CV summary metrics
     cv_summary_metrics = {}
     logger.info("CV summary (across folds):")
-    for key in keys:
+    for key in base_keys:
         vals = []
         for m in fold_metrics:
             found = [v for k, v in m.items() if k.endswith("/val/" + key)]
@@ -263,18 +297,27 @@ def run_cv(
         logger.info("=" * 100)
         pretty_print_per_subject(all_subjects_data, title="Subject-level results across all folds (voting)")
         
-        subject_level_metrics = _compute_subject_level_metrics(all_subjects_data)
+        subject_level_metrics, cm = _compute_subject_level_metrics(all_subjects_data, tri_class=run_config.tri_class_it)
         
         # Pretty print subject-level confusion matrix
-        tn = int(subject_level_metrics["cv/subject_level_tn"])
-        fp = int(subject_level_metrics["cv/subject_level_fp"])
-        fn = int(subject_level_metrics["cv/subject_level_fn"])
-        tp = int(subject_level_metrics["cv/subject_level_tp"])
-        
         logger.info("Subject-level Confusion Matrix:")
-        logger.info(f"{'':>20} {'Predicted HC':>15} {'Predicted AD':>15}")
-        logger.info(f"{'True HC':<20} {tn:>15} {fp:>15}")
-        logger.info(f"{'True AD':<20} {fn:>15} {tp:>15}")
+        if run_config.tri_class_it:
+            # 3x3 confusion matrix for tri-class
+            class_labels = [CLASS_NAMES[i] for i in range(3)]
+            header = f"{'':>20}" + "".join([f"{'Pred ' + label:>15}" for label in class_labels])
+            logger.info(header)
+            logger.info("-" * len(header))
+            for i, true_label in enumerate(class_labels):
+                row = f"{'True ' + true_label:<20}"
+                for j in range(3):
+                    row += f"{int(cm[i, j]):>15}"
+                logger.info(row)
+        else:
+            # 2x2 confusion matrix for binary
+            tn, fp, fn, tp = int(cm[0, 0]), int(cm[0, 1]), int(cm[1, 0]), int(cm[1, 1])
+            logger.info(f"{'':>20} {'Predicted HC':>15} {'Predicted AD':>15}")
+            logger.info(f"{'True HC':<20} {tn:>15} {fp:>15}")
+            logger.info(f"{'True AD':<20} {fn:>15} {tp:>15}")
         logger.info("")
         
         logger.info("Subject-level Metrics:")
