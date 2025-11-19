@@ -132,7 +132,7 @@ class FlexibleSEConfig(NetworkConfig):
         return self
 
 class FlexibleSE(nn.Module):
-    def __init__(self, cfg: FlexibleSEConfig):
+    def __init__(self, cfg: FlexibleSEConfig, tri_class_it: bool = False):
         super(FlexibleSE, self).__init__()
 
         if cfg.activation == "relu":
@@ -178,7 +178,10 @@ class FlexibleSE(nn.Module):
         self.layers = nn.Sequential(*layers)
 
         self.global_avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.classifier = nn.Linear(cfg.n_filters[-1], 1)
+        if tri_class_it:  # Tri-class classification
+            self.classifier = nn.Linear(cfg.n_filters[-1], 3)
+        else:
+            self.classifier = nn.Linear(cfg.n_filters[-1], 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if x.dim() == 3:
