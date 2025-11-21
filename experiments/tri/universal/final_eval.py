@@ -4,8 +4,8 @@ from typing import Dict, List, Tuple
 from dotenv import load_dotenv
 from loguru import logger
 
-from core.schemas import RawDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig, MultiDatasetConfig
-from models.shallow_concatter_se import ShallowConcatterSEConfig
+from core.schemas import SpectralDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
+from models.spectral_net import AdvancedSpectralNetConfig
 from models.squeezer import FlexibleSEConfig
 from core.logging import make_logger, Logger
 from core.builders import build_dataset
@@ -122,6 +122,7 @@ def train_and_evaluate(
         run_config.dataset_config,
         subjects_list=train_subjects,
         validation=False,
+        tri_class_it=run_config.tri_class_it,
     )
     
     # Extract normalization stats
@@ -133,6 +134,7 @@ def train_and_evaluate(
         subjects_list=val_subjects,
         validation=True,
         norm_stats=train_norm_stats,
+        tri_class_it=run_config.tri_class_it,
     )
     
     # Train model
@@ -156,6 +158,7 @@ def train_and_evaluate(
         dataset=validation_dataset,
         device=device,
         batch_size=run_config.batch_size,
+        tri_class_it=run_config.tri_class_it,
     )
     optimal_threshold = val_result.best_threshold
     logger.success(f"Optimal threshold from validation: {optimal_threshold:.4f}")
@@ -181,6 +184,7 @@ def train_and_evaluate(
             subjects_list=test_subjects,
             validation=True,
             norm_stats=train_norm_stats,
+            tri_class_it=run_config.tri_class_it,
         )
         
         # Evaluate with fixed threshold
@@ -192,12 +196,14 @@ def train_and_evaluate(
             logger_sink=magic_logger,
             prefix=f"test_{test_category}",
             fixed_threshold=optimal_threshold,
+            tri_class_it=run_config.tri_class_it,
         )
         
         # Pretty print per-subject results
         pretty_print_per_subject(
             eval_result.per_subject,
-            title=f"Trained on {training_category.upper()} → Test on {test_category.upper()}"
+            title=f"Trained on {training_category.upper()} → Test on {test_category.upper()}",
+            tri_class=run_config.tri_class_it,
         )
         
         # Log summary
@@ -220,30 +226,19 @@ def main() -> None:
     # Configure model with requested hyperparameters (from command-line options)
     # --activation=leaky_relu --architecture=balanced_3layer --batch_size=64 --dropout_rate=0.25047434239185595 --learning_rate=0.005400434790402595 --norm_type=group --raw_normalization=control-global --reduction_ratio=32 --use_se_blocks=False --weight_decay=0.0004147760689219528
 
-    model_config = ShallowConcatterSEConfig(
-        model_name="ShallowConcatterSE",
-        use_se_blocks=False,
-        reduction_ratio=32,
-        n_filters=[48, 96],  # "medium_2layer" preset
-        kernel_sizes=[(35, 9), (7, 5)],
-        strides=[(5, 3), (3, 2)],
-        paddings=[(3, 2), (2, 1)],
-        raw_norm_type="batch",
-        raw_dropout_rate=0.2069450016142799,
-        n_spectral_features=16,
-        spectral_hidden_size=32,
-        spectral_norm_type="batch",
-        spectral_dropout_rate=0.30765338122540664,
-        concat_dropout_rate=0.48643262126191605,
-        fusion_hidden_size=128,
-        fusion_norm_enabled=True,
-        activation="relu",
-        gap_length=8,
+    model_config = AdvancedSpectralNetConfig(
+        model_name="AdvancedSpectralNet",
+        input_size=16,
+        hidden_1_size=128,
+        hidden_2_size=128,
+        dropout_rate=0.5826136974792104,
+        add_batch_norm=True,
+        activation="silu",
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=2.9312695491966217e-05,
-        weight_decay=2.435242678073806e-06,
+        learning_rate=0.000716871746222609,
+        weight_decay=0.000594023415514721,
         use_cosine_annealing=False,
     )
 
@@ -254,7 +249,7 @@ def main() -> None:
 
     # Specify dataset category to train on (change as needed)
     # Options: 'poctep', 'hurh', 'meg', 'eeg', 'all'
-    training_category = "eeg"  # Change this to switch training dataset
+    training_category = "poctep"  # Change this to switch training dataset
 
     # Configure dataset - should match the training category
     # For single datasets, use just that dataset name
@@ -269,10 +264,9 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown training category: {training_category}")
 
-    dataset_config = MultiDatasetConfig(
+    dataset_config = SpectralDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=dataset_names,
-        raw_normalization="channel-subject",
         spectral_normalization="standard",
     )
 
@@ -282,15 +276,15 @@ def main() -> None:
         criterion_config=criterion_config,
         dataset_config=dataset_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
-        batch_size=64,
+        batch_size=16,
         max_epochs=50,
         patience=10,
         min_delta=0.001,
         early_stopping_metric='loss',
         log_to_wandb=True,
         wandb_init={
-            "project": "AD_vs_MCI_vs_AD_final_eval",
-            "run_name": f"train_on_{training_category}_multi",
+            "project": "HC_vs_MCI_vs_AD_final_eval",
+            "run_name": f"train_on_{training_category}_spectral",
         },
         tri_class_it=True,
     )
