@@ -57,7 +57,7 @@ parameters:
   raw_normalization:
     values: ['sample-channel', 'sample', 'channel-subject', 'subject', 'channel-dataset', 'dataset', 'control-channel', 'control-global']
 
-program: experiments.AD_vs_HC.universal.raw.sweep
+program: experiments.tri.universal.raw.sweep
 
 command:
   - ${env}
