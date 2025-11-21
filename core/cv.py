@@ -28,6 +28,14 @@ load_dotenv()
 # Class name mapping for tri-class classification
 CLASS_NAMES = {0: "HC", 1: "MCI", 2: "AD"}
 
+def _get_class_name(label: int, tri_class: bool) -> str:
+    """Get class name for a label, handling binary vs tri-class."""
+    if tri_class:
+        return CLASS_NAMES[label]
+    else:
+        # Binary: 0=HC, 1=AD
+        return "HC" if label == 0 else "AD"
+
 
 def _subject_type(subject_id: str) -> str:
     if "ADMIL" in subject_id:
@@ -252,8 +260,10 @@ def run_cv(
                 if subject not in all_subjects_data:
                     all_subjects_data[subject] = {"true_label": counts["true_label"]}
                     # Initialize prediction counters
-                    for class_idx in range(3 if run_config.tri_class_it else 2):
-                        all_subjects_data[subject][f"pred_{CLASS_NAMES[class_idx]}"] = 0
+                    n_classes = 3 if run_config.tri_class_it else 2
+                    for class_idx in range(n_classes):
+                        class_name = _get_class_name(class_idx, run_config.tri_class_it)
+                        all_subjects_data[subject][f"pred_{class_name}"] = 0
                 # Aggregate prediction counts
                 for key in counts:
                     if key.startswith("pred_"):

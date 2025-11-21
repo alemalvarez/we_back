@@ -10,7 +10,7 @@ from core.cv import run_cv
 load_dotenv()
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5")
-SPLITS_JSON_PATH = "experiments/AD_vs_HC/universal/universal_splits.json"
+SPLITS_JSON_PATH = "experiments/tri/universal/universal_splits_tri.json"
 N_FOLDS = 5
 
 def _read_subjects(path: str, dataset_name: str) -> list[str]:
@@ -57,7 +57,7 @@ def main() -> None:
         dataset_config=dataset_config,
         random_seed=42,
         batch_size=32,
-        max_epochs=50,
+        max_epochs=75,
         patience=10,
         min_delta=0.001,
         early_stopping_metric='loss',
@@ -65,6 +65,7 @@ def main() -> None:
         wandb_init={
             "project": "test-da-framework",
         },
+        tri_class_it=True,
     )
 
     magic_logger = make_logger(wandb_enabled=run_config.log_to_wandb, wandb_init=run_config.wandb_init)

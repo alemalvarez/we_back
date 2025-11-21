@@ -25,6 +25,14 @@ from core.logging import Logger
 # Class name mapping for tri-class classification
 CLASS_NAMES = {0: "HC", 1: "MCI", 2: "AD"}
 
+def _get_class_name(label: int, tri_class: bool) -> str:
+    """Get class name for a label, handling binary vs tri-class."""
+    if tri_class:
+        return CLASS_NAMES[label]
+    else:
+        # Binary: 0=HC, 1=AD
+        return "HC" if label == 0 else "AD"
+
 @dataclass
 class EvaluationResult:
     metrics: Mapping[str, float]
@@ -198,10 +206,13 @@ def evaluate_dataset(
             if subj not in per_subject:
                 per_subject[subj] = {"true_label": y_t_int}
                 # Initialize prediction counters
-                for class_idx in range(3 if tri_class_it else 2):
-                    per_subject[subj][f"pred_{CLASS_NAMES[class_idx]}"] = 0
+                n_classes = 3 if tri_class_it else 2
+                for class_idx in range(n_classes):
+                    class_name = _get_class_name(class_idx, tri_class_it)
+                    per_subject[subj][f"pred_{class_name}"] = 0
             # Increment prediction count
-            per_subject[subj][f"pred_{CLASS_NAMES[y_p_int]}"] += 1
+            pred_class_name = _get_class_name(y_p_int, tri_class_it)
+            per_subject[subj][f"pred_{pred_class_name}"] += 1
 
     # Optional logging to the unified logger
     if logger_sink is not None:
@@ -288,7 +299,7 @@ def pretty_print_per_subject(per_subject: Optional[Dict[str, Dict[str, int]]], *
     for subject in sorted(per_subject.keys()):
         counts = per_subject[subject]
         true_label = counts["true_label"]
-        true_class = CLASS_NAMES[true_label]
+        true_class = _get_class_name(true_label, tri_class)
         
         if tri_class:
             hc = counts["pred_HC"]
