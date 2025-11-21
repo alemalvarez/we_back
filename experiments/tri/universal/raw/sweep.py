@@ -11,7 +11,7 @@ from core.cv import run_cv
 load_dotenv()
 
 H5_FILE_PATH = os.getenv("H5_FILE_PATH", "artifacts/combined_DK_features_only:v0/combined_DK_features_only.h5")
-SPLITS_JSON_PATH = "experiments/AD_vs_HC/universal/universal_splits.json"
+SPLITS_JSON_PATH = "experiments/tri/universal/universal_splits_tri.json"
 N_FOLDS = 5
 
 def _read_subjects(path: str, dataset_name: str) -> list[str]:
@@ -156,14 +156,15 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
         min_delta=0.001,
         early_stopping_metric='loss',
         log_to_wandb=True,
-        wandb_init=None
+        wandb_init=None,
+        tri_class_it=True,
     )
     return run_config
 
 def main() -> None:
     # Expect a W&B agent to have initialized the run; otherwise, init minimally
     if wandb.run is None:
-        wandb.init(project=os.getenv("WANDB_PROJECT", "AD_vs_HC"))
+        wandb.init(project=os.getenv("WANDB_PROJECT", "HC_vs_MCI_vs_AD"))
 
     cfg = wandb.config
 
