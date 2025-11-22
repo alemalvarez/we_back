@@ -93,6 +93,76 @@ class DeeperSE(nn.Module):
         x = x.flatten(1)
         return self.classifier(x)
 
+ARCHITECTURE_PRESETS = {
+    # 2-layer architectures (shallow, fewer params)
+    "tiny_2layer": {
+        "n_filters": [16, 32],
+        "kernel_sizes": [(40, 2), (8, 5)],
+        "strides": [(12, 6), (10, 5)],
+        "paddings": [(5, 0), (1, 1)],
+    },
+    "small_2layer": {
+        "n_filters": [32, 64],
+        "kernel_sizes": [(50, 3), (10, 5)],
+        "strides": [(10, 2), (8, 4)],
+        "paddings": [(10, 1), (2, 1)],
+    },
+    "compact_2layer": {
+        "n_filters": [16, 32],
+        "kernel_sizes": [(30, 4), (15, 3)],
+        "strides": [(15, 3), (12, 2)],
+        "paddings": [(5, 1), (3, 1)],
+    },
+    
+    # 3-layer architectures (medium complexity)
+    "small_3layer": {
+        "n_filters": [16, 32, 64],
+        "kernel_sizes": [(40, 2), (8, 5), (5, 2)],
+        "strides": [(12, 6), (10, 5), (5, 2)],
+        "paddings": [(5, 0), (1, 1), (1, 0)],
+    },
+    "medium_3layer": {
+        "n_filters": [32, 64, 128],
+        "kernel_sizes": [(30, 3), (10, 5), (5, 2)],
+        "strides": [(10, 2), (8, 4), (4, 2)],
+        "paddings": [(8, 1), (2, 1), (1, 1)],
+    },
+    "balanced_3layer": {
+        "n_filters": [24, 48, 96],
+        "kernel_sizes": [(50, 2), (15, 3), (8, 2)],
+        "strides": [(8, 2), (6, 3), (4, 2)],
+        "paddings": [(10, 1), (3, 1), (2, 1)],
+    },
+    
+    # 4-layer architectures (deeper)
+    "small_4layer": {
+        "n_filters": [16, 32, 64, 128],
+        "kernel_sizes": [(50, 3), (15, 5), (8, 3), (4, 2)],
+        "strides": [(10, 2), (8, 3), (4, 2), (2, 1)],
+        "paddings": [(10, 1), (3, 1), (2, 1), (1, 0)],
+    },
+    "deep_4layer": {
+        "n_filters": [32, 64, 96, 128],
+        "kernel_sizes": [(40, 2), (12, 4), (6, 3), (3, 2)],
+        "strides": [(12, 2), (8, 2), (4, 2), (2, 1)],
+        "paddings": [(8, 1), (2, 1), (1, 1), (1, 0)],
+    },
+    
+    # Alternative patterns
+    "wide_shallow": {
+        "n_filters": [64, 128],
+        "kernel_sizes": [(60, 2), (12, 4)],
+        "strides": [(8, 2), (6, 3)],
+        "paddings": [(5, 1), (2, 1)],
+    },
+    "narrow_deep": {
+        "n_filters": [16, 24, 32, 48],
+        "kernel_sizes": [(35, 4), (12, 4), (8, 2), (4, 2)],
+        "strides": [(8, 3), (6, 2), (4, 2), (2, 1)],
+        "paddings": [(5, 1), (2, 1), (2, 1), (1, 0)],
+    },
+}
+
 class FlexibleSEConfig(NetworkConfig):
     model_name: str = "FlexibleSE"
     use_se_blocks: bool = True

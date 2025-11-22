@@ -37,7 +37,7 @@ def build_run_config_from_wandb(cfg: wandb.Config) -> RunConfig:  # type: ignore
     criterion_config = CriterionConfig() # nothing to set for tri-class classification!
     dataset_config = SpectralDatasetConfig(
         h5_file_path=H5_FILE_PATH,
-        dataset_names=["meg"],
+        dataset_names=["poctep", "hurh", "meg"],
         spectral_normalization="standard",
     )
     run_config = RunConfig(

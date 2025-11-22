@@ -8,6 +8,7 @@ from core.schemas import SpectralDatasetConfig, OptimizerConfig, CriterionConfig
 from models.spectral_net import AdvancedSpectralNetConfig
 from models.squeezer import FlexibleSEConfig
 from core.logging import make_logger, Logger
+from core.schemas import RawDatasetConfig
 from core.builders import build_dataset
 from core.runner import run as run_single
 from core.evaluation import evaluate_dataset, pretty_print_per_subject
@@ -226,19 +227,23 @@ def main() -> None:
     # Configure model with requested hyperparameters (from command-line options)
     # --activation=leaky_relu --architecture=balanced_3layer --batch_size=64 --dropout_rate=0.25047434239185595 --learning_rate=0.005400434790402595 --norm_type=group --raw_normalization=control-global --reduction_ratio=32 --use_se_blocks=False --weight_decay=0.0004147760689219528
 
-    model_config = AdvancedSpectralNetConfig(
-        model_name="AdvancedSpectralNet",
-        input_size=16,
-        hidden_1_size=128,
-        hidden_2_size=128,
-        dropout_rate=0.5826136974792104,
-        add_batch_norm=True,
+    model_config = FlexibleSEConfig(
+        model_name="FlexibleSE",
+        use_se_blocks=False,
+        reduction_ratio=16,
+        n_filters=[32, 64, 128],
+        kernel_sizes=[(30, 3), (10, 5), (5, 2)],
+        strides=[(10, 2), (8, 4), (4, 2)],
+        paddings=[(8, 1), (2, 1), (1, 1)],
+        norm_type="batch",
+        dropout_rate=0.631376744657808,
+        input_shape=(1000, 68),
         activation="silu",
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=0.000716871746222609,
-        weight_decay=0.000594023415514721,
+        learning_rate=0.002270479380682154,
+        weight_decay=0.0004421913459877339,
         use_cosine_annealing=False,
     )
 
@@ -249,7 +254,7 @@ def main() -> None:
 
     # Specify dataset category to train on (change as needed)
     # Options: 'poctep', 'hurh', 'meg', 'eeg', 'all'
-    training_category = "poctep"  # Change this to switch training dataset
+    training_category = "meg"  # Change this to switch training dataset
 
     # Configure dataset - should match the training category
     # For single datasets, use just that dataset name
@@ -264,10 +269,10 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown training category: {training_category}")
 
-    dataset_config = SpectralDatasetConfig(
+    dataset_config = RawDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=dataset_names,
-        spectral_normalization="standard",
+        raw_normalization="channel-subject",
     )
 
     run_config = RunConfig(
@@ -276,7 +281,7 @@ def main() -> None:
         criterion_config=criterion_config,
         dataset_config=dataset_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
-        batch_size=16,
+        batch_size=32,
         max_epochs=50,
         patience=10,
         min_delta=0.001,
@@ -284,7 +289,7 @@ def main() -> None:
         log_to_wandb=True,
         wandb_init={
             "project": "HC_vs_MCI_vs_AD_final_eval",
-            "run_name": f"train_on_{training_category}_spectral",
+            "run_name": f"train_on_{training_category}_raw",
         },
         tri_class_it=True,
     )

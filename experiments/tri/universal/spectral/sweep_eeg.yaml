@@ -1,38 +1,38 @@
 name: definitive_eeg_spectral_net_sweep
 method: bayes
-project: AD_vs_MCI_vs_AD_EEG
+project: HC_vs_MCI_vs_AD_EEG
 metric:
-  name: cv/segment_level_final_f1_mean
+  name: cv/segment_level_final_kappa_mean
   goal: maximize
-run_cap: 50
+run_cap: 75
 
 parameters:
   learning_rate:
     distribution: log_uniform_values
-    min: 1.0e-5
+    min: 5.0e-5
     max: 1.0e-2
     
   weight_decay:
     distribution: log_uniform_values
     min: 1.0e-6
-    max: 1.0e-3
+    max: 1.0e-2
 
   dropout_rate:
     distribution: uniform
     min: 0.3
-    max: 0.5
+    max: 0.7
 
   hidden_1_size:
-    values: [8, 16, 32, 64, 128]
+    values: [16, 32, 64, 128, 256]
 
   hidden_2_size:
-    values: [8, 16, 32, 64, 128]
+    values: [16, 32, 64, 128, 256]
 
   activation:
-    values: [leaky_relu, relu, silu]
+    values: [leaky_relu, relu, gelu, silu]
 
   batch_size:
-    values: [32, 64, 128]
+    values: [16, 32, 64]
 
 program: experiments.tri.universal.spectral.sweep
 
