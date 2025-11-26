@@ -4,9 +4,8 @@ from typing import Dict, List, Tuple
 from dotenv import load_dotenv
 from loguru import logger
 
-from core.schemas import RawDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig, MultiDatasetConfig
+from core.schemas import OptimizerConfig, CriterionConfig, RunConfig, MultiDatasetConfig
 from models.shallow_concatter_se import ShallowConcatterSEConfig
-from models.squeezer import FlexibleSEConfig
 from core.logging import make_logger, Logger
 from core.builders import build_dataset
 from core.runner import run as run_single
@@ -222,28 +221,28 @@ def main() -> None:
 
     model_config = ShallowConcatterSEConfig(
         model_name="ShallowConcatterSE",
-        use_se_blocks=False,
-        reduction_ratio=32,
-        n_filters=[48, 96],  # "medium_2layer" preset
-        kernel_sizes=[(35, 9), (7, 5)],
-        strides=[(5, 3), (3, 2)],
-        paddings=[(3, 2), (2, 1)],
-        raw_norm_type="batch",
-        raw_dropout_rate=0.2069450016142799,
+        use_se_blocks=True,
+        reduction_ratio=16,
+        n_filters=[16, 32],  # "compact_2layer" preset from sweep.py
+        kernel_sizes=[(20, 5), (5, 3)],
+        strides=[(10, 5), (5, 3)],
+        paddings=[(2, 2), (1, 1)],
+        raw_norm_type="group",
+        raw_dropout_rate=0.2739604086520369,
         n_spectral_features=16,
         spectral_hidden_size=32,
-        spectral_norm_type="batch",
-        spectral_dropout_rate=0.30765338122540664,
-        concat_dropout_rate=0.48643262126191605,
+        spectral_norm_type="group",
+        spectral_dropout_rate=0.42093134246514224,
+        concat_dropout_rate=0.2497837809724299,
         fusion_hidden_size=128,
-        fusion_norm_enabled=True,
-        activation="relu",
-        gap_length=8,
+        fusion_norm_enabled=False,
+        activation="leaky_relu",
+        gap_length=4,
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=2.9312695491966217e-05,
-        weight_decay=2.435242678073806e-06,
+        learning_rate=6.612084147372404e-05,
+        weight_decay=0.0008637892398052351,
         use_cosine_annealing=False,
     )
 
@@ -272,7 +271,7 @@ def main() -> None:
     dataset_config = MultiDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=dataset_names,
-        raw_normalization="channel-subject",
+        raw_normalization="channel-dataset",
         spectral_normalization="standard",
     )
 

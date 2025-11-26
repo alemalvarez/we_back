@@ -143,10 +143,11 @@ class WandbLogger:
         if not metrics:
             return
         data = dict(metrics)
-        if step is not None:
-            self._wandb.log(data, step=step)
-        else:
-            self._wandb.log(data)
+        # if step is not None:
+        #     self._wandb.log(data, step=step)
+        # else:
+        #     self._wandb.log(data)
+        self._wandb.log(data) # i think that the step never gets used anyway!
 
     def watch(self, model: Any) -> None:  # type: ignore[override]
         if model is None:

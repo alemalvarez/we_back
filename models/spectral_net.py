@@ -2,7 +2,6 @@ import torch
 from torch import nn
 from typing import List
 from core.schemas import NetworkConfig
-from loguru import logger
 
 class SpectralNetConfig(NetworkConfig):
     model_name: str = "SpectralNet"

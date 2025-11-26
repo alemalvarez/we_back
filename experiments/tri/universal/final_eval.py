@@ -4,11 +4,9 @@ from typing import Dict, List, Tuple
 from dotenv import load_dotenv
 from loguru import logger
 
-from core.schemas import SpectralDatasetConfig, OptimizerConfig, CriterionConfig, RunConfig
-from models.spectral_net import AdvancedSpectralNetConfig
-from models.squeezer import FlexibleSEConfig
+from core.schemas import OptimizerConfig, CriterionConfig, RunConfig, MultiDatasetConfig
+from models.shallow_concatter_se import ShallowConcatterSEConfig
 from core.logging import make_logger, Logger
-from core.schemas import RawDatasetConfig
 from core.builders import build_dataset
 from core.runner import run as run_single
 from core.evaluation import evaluate_dataset, pretty_print_per_subject
@@ -227,23 +225,30 @@ def main() -> None:
     # Configure model with requested hyperparameters (from command-line options)
     # --activation=leaky_relu --architecture=balanced_3layer --batch_size=64 --dropout_rate=0.25047434239185595 --learning_rate=0.005400434790402595 --norm_type=group --raw_normalization=control-global --reduction_ratio=32 --use_se_blocks=False --weight_decay=0.0004147760689219528
 
-    model_config = FlexibleSEConfig(
-        model_name="FlexibleSE",
-        use_se_blocks=False,
+    model_config = ShallowConcatterSEConfig(
+        model_name="ShallowConcatterSE",
+        use_se_blocks=True,
         reduction_ratio=16,
-        n_filters=[32, 64, 128],
-        kernel_sizes=[(30, 3), (10, 5), (5, 2)],
-        strides=[(10, 2), (8, 4), (4, 2)],
-        paddings=[(8, 1), (2, 1), (1, 1)],
-        norm_type="batch",
-        dropout_rate=0.631376744657808,
-        input_shape=(1000, 68),
-        activation="silu",
+        n_filters=[16, 32],  # "compact_2layer" preset from sweep.py
+        kernel_sizes=[(20, 5), (5, 3)],
+        strides=[(10, 5), (5, 3)],
+        paddings=[(2, 1), (1, 1)],
+        raw_norm_type="batch",
+        raw_dropout_rate=0.4516341906899774,
+        n_spectral_features=16,
+        spectral_hidden_size=128,
+        spectral_norm_type="none",
+        spectral_dropout_rate=0.2606536276320501,
+        concat_dropout_rate=0.266882556505772,
+        fusion_hidden_size=128,
+        fusion_norm_enabled=True,
+        activation="leaky_relu",
+        gap_length=4,
     )
 
     optimizer_config = OptimizerConfig(
-        learning_rate=0.002270479380682154,
-        weight_decay=0.0004421913459877339,
+        learning_rate=0.007057721815610606,
+        weight_decay=0.00021286130098368837,
         use_cosine_annealing=False,
     )
 
@@ -269,10 +274,10 @@ def main() -> None:
     else:
         raise ValueError(f"Unknown training category: {training_category}")
 
-    dataset_config = RawDatasetConfig(
+    dataset_config = MultiDatasetConfig(
         h5_file_path=H5_FILE_PATH,
         dataset_names=dataset_names,
-        raw_normalization="channel-subject",
+        raw_normalization="sample-channel",
     )
 
     run_config = RunConfig(
@@ -281,7 +286,7 @@ def main() -> None:
         criterion_config=criterion_config,
         dataset_config=dataset_config,
         random_seed=int(os.getenv("RANDOM_SEED", 42)),
-        batch_size=32,
+        batch_size=128,
         max_epochs=50,
         patience=10,
         min_delta=0.001,
@@ -289,7 +294,7 @@ def main() -> None:
         log_to_wandb=True,
         wandb_init={
             "project": "HC_vs_MCI_vs_AD_final_eval",
-            "run_name": f"train_on_{training_category}_raw",
+            "run_name": f"train_on_{training_category}_multi",
         },
         tri_class_it=True,
     )

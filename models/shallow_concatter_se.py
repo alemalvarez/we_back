@@ -117,7 +117,7 @@ class ShallowConcatterSEConfig(NetworkConfig):
 
 
 class ShallowConcatterSE(nn.Module):
-    def __init__(self, cfg: ShallowConcatterSEConfig):
+    def __init__(self, cfg: ShallowConcatterSEConfig, tri_class_it: bool = False):
         super().__init__()
         
         # Get activation function
@@ -230,7 +230,10 @@ class ShallowConcatterSE(nn.Module):
         if cfg.fusion_norm_enabled:
             fusion_layers.append(nn.BatchNorm1d(cfg.fusion_hidden_size))
         
-        fusion_layers.append(nn.Linear(cfg.fusion_hidden_size, 1))
+        if tri_class_it:
+            fusion_layers.append(nn.Linear(cfg.fusion_hidden_size, 3))
+        else:
+            fusion_layers.append(nn.Linear(cfg.fusion_hidden_size, 1))
         
         self.fusion = nn.Sequential(*fusion_layers)
     

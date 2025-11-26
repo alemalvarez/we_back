@@ -1,10 +1,10 @@
 name: definitive_meg_multi_net_sweep
 method: bayes
-project: AD_vs_HC_MEG
+project: HC_vs_MCI_vs_AD_MEG
 metric:
-  name: cv/segment_level_final_f1_mean
+  name: cv/segment_level_final_kappa_mean
   goal: maximize
-run_cap: 50
+run_cap: 75
 
 parameters:
   # Architecture preset (shallow 2-layer configs)
@@ -81,7 +81,7 @@ parameters:
   activation:
     values: [relu, leaky_relu, gelu, silu]
 
-program: experiments.AD_vs_HC.universal.multi.sweep
+program: experiments.tri.universal.multi.sweep
 
 command:
   - ${env}
