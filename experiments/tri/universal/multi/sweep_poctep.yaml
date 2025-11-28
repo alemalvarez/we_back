@@ -1,8 +1,8 @@
 name: definitive_poctep_multi_net_sweep
 method: bayes
-project: AD_vs_HC_POCTEP
+project: HC_vs_MCI_vs_AD_POCTEP
 metric:
-  name: cv/segment_level_final_f1_mean
+  name: cv/segment_level_final_kappa_mean
   goal: maximize
 run_cap: 50
 
@@ -52,7 +52,7 @@ parameters:
   
   # Spectral branch parameters
   spectral_hidden_size:
-    values: [32, 64, 128]
+    values: [32, 64, 128, 256]
   
   # Fusion parameters
   fusion_hidden_size:
@@ -70,7 +70,7 @@ parameters:
   weight_decay:
     distribution: log_uniform_values
     min: 1.0e-6
-    max: 1.0e-3
+    max: 5.0e-3
 
   batch_size:
     values: [32, 64, 128]
@@ -81,7 +81,7 @@ parameters:
   activation:
     values: [relu, leaky_relu, gelu, silu]
 
-program: experiments.AD_vs_HC.universal.multi.sweep
+program: experiments.tri.universal.multi.sweep
 
 command:
   - ${env}
